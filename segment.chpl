@@ -29,65 +29,66 @@ module Segment {
 
   class MemorySegment : Segment {
 
-    config const predicateHashTableSize: uint = 1024 * 32;
+    const predicateHashTableCount: uint = 1024 * 32;
 
     // Master table from triple -> tripleEntry -> Document posting list
     // This is a lock-free table and uses atomic PredicateEntryPoolIndex values to point to allocatiosn in the predicateEntryPool
-    var predicateHashTable: [0..predicateHashTableSize-1] atomic PredicateEntryPoolIndex;
+    var predicateHashTable: [0..#predicateHashTableCount] atomic EntryPoolIndex;
 
     class PredicateEntry {
-      var triple: Triple;
+      var predicate: PredicateId;
 
-      // pointer to the last document id in the doc id pool
-      var lastTripleIdIndex: atomic TripleIdPoolIndex;
+      var tripleIdCount: atomic uint;
+      var triples = new ObjectPool(Triple);
+      var triplesHead: EntryPoolIndex;
 
-      // next term in the bucket chain
-      var next: atomic PredicateEntryPoolIndex;
-
-      proc PredicateEntry(triple: Triple, poolIndex: PredicateEntryPoolIndex) {
-        this.triple = triple;
-        this.next.write(poolIndex);
+      proc add(triple: Triple): EntryPoolIndex {
+        var entryIndex = get(triple);
+        if (entryIndex == -1) {
+          entryIndex = triples.add(triple, triplesHead);
+        }
+        tripleIdCount.add(1);
+        return entryIndex;
       }
 
-      // total number of triples this predicate appears in
-      var tripleIdCount: atomic uint;
+      proc get(triple: Triple): EntryPoolIndex {
+        var entryIndex = triplesHead;
+        while (entryIndex != 0) {
+          if (triples.getItemByIndex(entryIndex) == triple) then return entryIndex;
+          entryIndex = triples.getNextByIndex(entryIndex);
+        }
+        return -1;
+      }
     }
 
-    proc add(item: Item): ObjectEntryPoolIndex {
-      var poolIndex: ObjectEntryPoolIndex;
+    inline proc predicateHashTableIndexForTriple(triple: Triple): uint {
+      return genHashKey32(triple) % predicateHashTable.size: uint(32);
+    }
 
-      var entry = get(item);
-      if (entry == nil) {
-        /*// no triple in this table position, allocate a new triple in the triple pool
-        entry = new ObjectEntry(triple, predicateHashTable[tableIndexFortriple(triple)].read());
-        poolIndex = allocateNewDocIdInDocumentIdPool(docId);
-        entry.lastTripleIdIndex.write(poolIndex);
-        var entryIndex = setObjectEntryAtNextObjectEntryPoolIndex(entry);
-        predicateHashTable[tableIndexFortriple(triple)].write(entryIndex);*/
-      } else {
-        poolIndex = setDocIdAtNextDocumentIdPoolIndex(entry.lastTripleIdIndex.read(), docId);
-        entry.lastTripleIdIndex.write(poolIndex);
+    proc addPredicate(predicate: PredicateId): EntryPoolIndex {
+      var poolIndex: EntryPoolIndex;
+
+      var entryIndex = get(triple);
+      if (entryIndex == -1) {
+        var entryIndex = predicateHashTable[tableIndexForTriple(triple)].read();
+        predicateHashTable[tableIndexFortriple(triple)].write(entryIndex);
       }
       entry.documentIdCount.add(1);
 
       return poolIndex;
     }
 
-    proc getObjectEntryForTriple(triple: Triple): ObjectEntry {
+    proc get(triple: Triple): EntryPoolIndex {
       // iterate through the entries at this table position
       var entryIndex = predicateHashTable[predicateHashTableIndexForTriple(term)].read();
       while (entryIndex != 0) {
-        var entry = getPoolEntry(entryIndex);
-        if (entry.term == term) {
-          return entry;
+        var entryTriple = getItemByIndex(entryIndex);
+        if (entryTriple == triple) {
+          return entryIndex;
         }
         entryIndex = entry.next.read();
       }
-      return nil;
-    }
-
-    inline proc predicateHashTableIndexForTriple(triple: Triple): uint {
-      return genHashKey32(triple) % predicateHashTable.size: uint(32);
+      return -1;
     }
 
     proc addTriple(triple: Triple): bool {

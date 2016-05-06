@@ -30,7 +30,7 @@ module ObjectPool {
       return (bankIdx, entryPos);
     }
 
-    proc addItem(item: T, poolIndex: EntryPoolIndex, next: EntryPoolIndex): EntryPoolIndex {
+    proc add(item: T, next: EntryPoolIndex): EntryPoolIndex {
       totalEntryCount += 1;
 
       var bankEntryPos = totalEntryCount: uint % bankSize;
@@ -45,9 +45,19 @@ module ObjectPool {
       return assembleEntryPoolIndex(bankIndex: uint(32), bankEntryPos: uint(32));
     }
 
-    inline proc getEntryByIndex(poolIndex: EntryPoolIndex): Entry {
+    inline proc getEntryByIndex(poolIndex: EntryPoolIndex): PoolEntry {
       var (bankIndex, entryPos) = splitEntryPoolIndex(poolIndex);
       return banks[bankIndex].entries[entryPos];
+    }
+
+    inline proc getItemByIndex(poolIndex: EntryPoolIndex): T {
+      var (bankIndex, entryPos) = splitEntryPoolIndex(poolIndex);
+      return banks[bankIndex].entries[entryPos].item;
+    }
+
+    inline proc getNextByIndex(poolIndex: EntryPoolIndex): EntryPoolIndex {
+      var (bankIndex, entryPos) = splitEntryPoolIndex(poolIndex);
+      return banks[bankIndex].entries[entryPos].next;
     }
 
     inline proc isFull(): bool {
