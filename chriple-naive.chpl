@@ -5,14 +5,9 @@
   does not make an effort to be super efficient with storage.
 
 */
-use Chasm, Common, GenHashKey32, Logging, Segment, Operands, PrivateDist, Time;
+use Chasm, Common, GenHashKey32, Logging, Operand, PrivateDist, Segment, Time;
 
-record Query {
-}
-
-record QueryResult {
-  var triple: Triple;
-}
+var Partitions: [PrivateSpace] PartitionManager;
 
 class PartitionManager {
   var segment: Segment;
@@ -38,14 +33,10 @@ proc initPartitions() {
   var t: Timer;
   t.start();
 
-  for loc in Locales {
-    on loc {
-      local {
-        // TODO: handle multiple segments
-        Partitions[here.id] = new PartitionManager(new MemorySegment());
-        NullOperand[here.id] = new Operand();
-      }
-    }
+  for loc in Locales do on loc do local {
+    // TODO: handle multiple segments
+    Partitions[here.id] = new PartitionManager(new MemorySegment());
+    NullOperand[here.id] = new Operand();
   }
 
   t.stop();
@@ -54,10 +45,8 @@ proc initPartitions() {
 
 proc addTriple(triple: Triple) {
   var partitionId = partidionIdForTriple(triple);
-  on Partitions[partitionId] {
-    local {
-      Partitions[here.id].addTriple(triple);
-    }
+  on Partitions[partitionId] do local {
+    Partitions[here.id].addTriple(triple);
   }
 }
 

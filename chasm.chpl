@@ -3,7 +3,7 @@
 */
 module Chasm {
 
-  use Common, Logging, Operands, Segments;
+  use Common, Logging, Operand, Segment;
 
   type ChasmOp = uint(8); // CHASM opcode type
 
