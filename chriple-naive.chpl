@@ -7,34 +7,11 @@
 */
 use Chasm, Common, GenHashKey32, Logging, Operand, PrivateDist, Segment, Time;
 
-var Partitions: [PrivateSpace] PartitionManager;
-
-class PartitionManager {
-  var segment: Segment;
-
-  proc addTriple(triple: Triple): bool {
-    // TODO: handle multiple segments
-    var success = segment.addTriple(triple);
-    if (!success) {
-      // TODO: handle segmentFull scenario
-    }
-    return success;
-  }
-
-  iter query(query: Query): QueryResult {
-    // TODO: handle multiple segments
-    for opValue in segment.query(query) {
-      yield opValue;
-    }
-  }
-}
-
 proc initPartitions() {
   var t: Timer;
   t.start();
 
   for loc in Locales do on loc do local {
-    // TODO: handle multiple segments
     Partitions[here.id] = new PartitionManager(new MemorySegment());
     NullOperand[here.id] = new Operand();
   }
@@ -43,16 +20,16 @@ proc initPartitions() {
   timing("initialized partitions in ",t.elapsed(TimeUnits.microseconds), " microseconds");
 }
 
-proc addTriple(triple: Triple) {
-  var partitionId = partidionIdForTriple(triple);
-  on Partitions[partitionId] do local {
-    Partitions[here.id].addTriple(triple);
-  }
+proc partitionIdForTriple(triple: Triple): int {
+  return genHashKey32(triple.predicate) % numLocales;
 }
 
-proc addTriples(triples: [?D] Triple) {
-  // TODO: batching
-  for triple in triples do addTriple(triple);
+proc addTriple(triple: Triple) {
+  var partitionId = partitionIdForTriple(triple);
+  on Partitions[partitionId] do local {
+    // TODO: is triple local now?
+    Partitions[here.id].addTriple(triple);
+  }
 }
 
 proc addSyntheticData() {
