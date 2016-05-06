@@ -8,5 +8,13 @@ module Common {
     var subject: EntityId;
     var predicate: PredicateId;
     var object: EntityId;
+
+    proc toSOPair() {
+      return (subject << 32) | object;
+    }
+
+    proc toOSPair() {
+      return (object << 32) | subject;
+    }
   }
 }

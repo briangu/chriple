@@ -1,6 +1,6 @@
 module Segment {
 
-  use Common, ObjectPool, Operand, PrivateDist, Query;
+  use Common, ObjectPool, Operand, PrivateDist, Sort, Query;
 
   // Globally reusable Null / empty singleton operand
   var NullOperand: [PrivateSpace] Operand;
@@ -25,98 +25,92 @@ module Segment {
       halt("not implemented");
       return NullOperand[here.id];
     }
+
+    proc optimize() {
+      // NOP
+    }
   }
 
   class MemorySegment : Segment {
 
-    const predicateHashTableCount: uint = 1024 * 32;
+    var totalTripleCount: int;
 
-    // Master table from triple -> tripleEntry -> Document posting list
-    // This is a lock-free table and uses atomic PredicateEntryPoolIndex values to point to allocatiosn in the predicateEntryPool
-    var predicateHashTable: [0..#predicateHashTableCount] atomic EntryPoolIndex;
+    const predicateHashTableCount: uint = 1024 * 32;
 
     class PredicateEntry {
       var predicate: PredicateId;
 
-      var tripleIdCount: atomic uint;
-      var triples = new ObjectPool(Triple);
-      var triplesHead: EntryPoolIndex;
+      var count: int;
+      var soEntries: [0..#1024] EntityPair;
+      var osEntries: [0..#1024] EntityPair;
 
-      proc add(triple: Triple): EntryPoolIndex {
-        var entryIndex = get(triple);
-        if (entryIndex == -1) {
-          entryIndex = triples.add(triple, triplesHead);
+      proc add(triple: Triple): int {
+        var soEntry = triple.toSOPair();
+        var (found,idx) = soEntries.find(soEntry);
+        if (!found) {
+          soEntries.push_back(soEntry);
+          osEntries.push_back(triple.toOSPair());
         }
-        tripleIdCount.add(1);
-        return entryIndex;
       }
 
-      proc get(triple: Triple): EntryPoolIndex {
-        var entryIndex = triplesHead;
-        while (entryIndex != 0) {
-          if (triples.getItemByIndex(entryIndex) == triple) then return entryIndex;
-          entryIndex = triples.getNextByIndex(entryIndex);
-        }
-        return -1;
+      proc optimize() {
+        QuickSort(soEntries);
+        QuickSort(osEntries);
       }
     }
 
-    inline proc predicateHashTableIndexForTriple(triple: Triple): uint {
-      return genHashKey32(triple) % predicateHashTable.size: uint(32);
+    // Master table from triple -> tripleEntry -> Document posting list
+    // This is a lock-free table and uses atomic PredicateEntryPoolIndex values to point to allocatiosn in the predicateEntryPool
+    var predicateHashTable: [0..#predicateHashTableCount] PredicateEntry;
+
+    inline proc predicateHashTableIndexForTriple(triple: Triple): int {
+      return genHashKey32(triple.predicate) % predicateHashTableCount;
     }
 
-    proc addPredicate(predicate: PredicateId): EntryPoolIndex {
-      var poolIndex: EntryPoolIndex;
+    proc add(triple: Triple): PredicateEntry {
+      var entryIndex = predicateHashTableIndexForTriple(triple);;
 
-      var entryIndex = get(triple);
-      if (entryIndex == -1) {
-        var entryIndex = predicateHashTable[tableIndexForTriple(triple)].read();
-        predicateHashTable[tableIndexFortriple(triple)].write(entryIndex);
-      }
-      entry.documentIdCount.add(1);
-
-      return poolIndex;
-    }
-
-    proc get(triple: Triple): EntryPoolIndex {
-      // iterate through the entries at this table position
-      var entryIndex = predicateHashTable[predicateHashTableIndexForTriple(term)].read();
-      while (entryIndex != 0) {
-        var entryTriple = getItemByIndex(entryIndex);
-        if (entryTriple == triple) {
-          return entryIndex;
+      var entry = predicateHashTable[entryIndex];
+      while (predicateHashTable[entryIndex] != nil) {
+        if (entry.predicate == triple.predicate) {
+          return entry;
         }
-        entryIndex = entry.next.read();
+        entryIndex = (entryIndex + 1) % predicateHashTableCount;
+        entry = predicateHashTable[entryIndex];
       }
-      return -1;
+
+      entry = new PredicateEntry(triple.predicate);;
+      predicateHashTable[entryIndex] = entry;
+      entry.count += 1;
+
+      return entry;
+    }
+
+    proc get(triple: Triple): PredicateEntry {
+      // iterate through the entries starting at this table position
+      var entryIndex = predicateHashTableIndexForTriple(triple);
+      var entry = predicateHashTable[entryIndex];
+      while (entry != nil) {
+        if (entry.predicate == triple.predicate) {
+          return entry;
+        }
+        entryIndex = (entryIndex + 1) % predicateHashTableCount;
+        entry = predicateHashTable[entryIndex];
+      }
+      return nil;
     }
 
     proc addTriple(triple: Triple): bool {
-      if (isSegmentFull()) {
-        // segment is full:
-        // upon segment full, the segment manager should
-        //    create a new segment
-        //    append this to the new one
-        //    flush the segment in the background
-        //    replace this in-memory segment with a segment that references disk
-        return false;
+      if (isSegmentFull()) then return false;
+
+      var predicateEntry = add(triple);
+      if (predicateEntry) {
+        predicateEntry.add(triple);
+        totalTripleCount += 1;
+        return true;
       }
 
-      /*// store the external document id and map it to our internal document index
-      // NOTE: this assumes we are going to succeed in adding the document
-      // TODO: is this going to race?  what if two threads are trying to add a new document?
-      var documentIndex = documentCount.read();
-
-      externalDocumentIds[documentIndex] = externalDocId;
-
-      for term in terms {
-        var docId = assembleDocId(documentIndex, term.textLocation);
-        addTermForDocument(term.term, docId);
-      }
-
-      documentCount.add(1);*/
-
-      return true;
+      return false;
     }
 
     iter query(query: Query): QueryResult {
@@ -127,6 +121,13 @@ module Segment {
     proc operandForTriple(triple: Triple): Operand {
       halt("not implemented");
       return NullOperand[here.id];
+    }
+
+    proc optimize() {
+      forall i in predicateHashTable.domain {
+        var entry = predicateHashTable[i];
+        if (entry) then entry.optimize();
+      }
     }
   }
 }
