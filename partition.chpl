@@ -13,5 +13,9 @@ module Partition {
     iter query(query: Query): QueryResult {
       for opValue in segment.query(query) do yield opValue;
     }
+
+    iter dump(): Triple {
+      for triple in segment.dump() do yield triple;
+    }
   }
 }

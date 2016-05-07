@@ -26,9 +26,9 @@ module Segment {
       return NullOperand[here.id];
     }
 
-    proc optimize() {
-      // NOP
-    }
+    proc optimize() {}
+
+    iter dump(): Triple { halt(); yield new Triple(0,0,0); }
   }
 
   class NaiveMemorySegment : Segment {
@@ -48,14 +48,23 @@ module Segment {
         var soEntry = triple.toSOPair();
         var (found,idx) = soEntries.find(soEntry);
         if (!found) {
-          soEntries.push_back(soEntry);
-          osEntries.push_back(triple.toOSPair());
+          writeln("adding ", triple, " count = ", count, " on locale ", here.id);
+          soEntries[count] = soEntry;
+          osEntries[count] = triple.toOSPair();
+          count += 1;
+        } else {
+          writeln("found ", triple);
         }
       }
 
       proc optimize() {
-        QuickSort(soEntries);
-        QuickSort(osEntries);
+        QuickSort(soEntries[0..#count]);
+        QuickSort(osEntries[0..#count]);
+      }
+
+      iter dump(): Triple {
+        writeln(soEntries[0..#count], " count = ", count);
+        for i in 0..#count do yield toTriple(soEntries[i], predicate);
       }
     }
 
@@ -81,7 +90,7 @@ module Segment {
 
       entry = new PredicateEntry(triple.predicate);;
       predicateHashTable[entryIndex] = entry;
-      entry.count += 1;
+      /*entry.count += 1;*/
 
       return entry;
     }
@@ -100,17 +109,23 @@ module Segment {
       return nil;
     }
 
-    proc addTriple(triple: Triple): bool {
-      if (isSegmentFull()) then return false;
-
-      var predicateEntry = getOrAddPredicateEntry(triple);
-      if (predicateEntry) {
-        predicateEntry.add(triple);
-        totalTripleCount += 1;
-        return true;
-      }
-
+    inline proc isSegmentFull(): bool {
       return false;
+    }
+
+    proc addTriple(triple: Triple): bool {
+      {
+        if (isSegmentFull()) then return false;
+
+        var predicateEntry = getOrAddPredicateEntry(triple);
+        if (predicateEntry) {
+          predicateEntry.add(triple);
+          totalTripleCount += 1;
+          return true;
+        }
+
+        return false;
+      }
     }
 
     iter query(query: Query): QueryResult {
@@ -127,6 +142,15 @@ module Segment {
       forall i in predicateHashTable.domain {
         var entry = predicateHashTable[i];
         if (entry) then entry.optimize();
+      }
+    }
+
+    iter dump(): Triple {
+      for i in predicateHashTable.domain {
+        var entry = predicateHashTable[i];
+        if (entry) {
+          for triple in entry.dump() do yield triple;
+        }
       }
     }
   }

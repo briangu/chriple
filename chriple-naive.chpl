@@ -26,22 +26,24 @@ proc partitionIdForTriple(triple: Triple): int {
 
 proc addTriple(triple: Triple) {
   var partitionId = partitionIdForTriple(triple);
-  on Partitions[partitionId] do local {
-    // TODO: is triple local now?
-    Partitions[here.id].addTriple(triple);
-  }
+  on Partitions[partitionId] do local Partitions[here.id].addTriple(triple);
 }
 
 proc addSyntheticData() {
   addTriple(new Triple(1,2,3));
+  addTriple(new Triple(3,4,5));
 }
 
-proc querySyntheticData() {
-
+proc dump() {
+  for loc in Locales do on loc do for triple in Partitions[here.id].dump() do writeln(triple);
 }
 
 proc main() {
+  writeln("starting tests");
+  testTriple();
+  writeln("ending tests");
+
   initPartitions();
   addSyntheticData();
-  querySyntheticData();
+  dump();
 }
