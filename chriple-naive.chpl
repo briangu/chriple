@@ -5,14 +5,14 @@
   does not make an effort to be super efficient with storage.
 
 */
-use Chasm, Common, GenHashKey32, Logging, Operand, PrivateDist, Segment, Time;
+use Chasm, Common, GenHashKey32, Logging, Operand, Partition, PrivateDist, Segment, Time;
 
 proc initPartitions() {
   var t: Timer;
   t.start();
 
   for loc in Locales do on loc do local {
-    Partitions[here.id] = new PartitionManager(new MemorySegment());
+    Partitions[here.id] = new PartitionManager(new NaiveMemorySegment());
     NullOperand[here.id] = new Operand();
   }
 
@@ -33,7 +33,7 @@ proc addTriple(triple: Triple) {
 }
 
 proc addSyntheticData() {
-
+  addTriple(new Triple(1,2,3));
 }
 
 proc querySyntheticData() {

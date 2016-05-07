@@ -1,6 +1,6 @@
 module Segment {
 
-  use Common, ObjectPool, Operand, PrivateDist, Sort, Query;
+  use Common, GenHashKey32, ObjectPool, Operand, PrivateDist, Sort, Query;
 
   // Globally reusable Null / empty singleton operand
   var NullOperand: [PrivateSpace] Operand;
@@ -31,11 +31,11 @@ module Segment {
     }
   }
 
-  class MemorySegment : Segment {
+  class NaiveMemorySegment : Segment {
 
     var totalTripleCount: int;
 
-    const predicateHashTableCount: uint = 1024 * 32;
+    const predicateHashTableCount: uint(32) = 1024 * 32;
 
     class PredicateEntry {
       var predicate: PredicateId;
@@ -44,7 +44,7 @@ module Segment {
       var soEntries: [0..#1024] EntityPair;
       var osEntries: [0..#1024] EntityPair;
 
-      proc add(triple: Triple): int {
+      proc add(triple: Triple) {
         var soEntry = triple.toSOPair();
         var (found,idx) = soEntries.find(soEntry);
         if (!found) {
@@ -67,7 +67,7 @@ module Segment {
       return genHashKey32(triple.predicate) % predicateHashTableCount;
     }
 
-    proc add(triple: Triple): PredicateEntry {
+    proc getOrAddPredicateEntry(triple: Triple): PredicateEntry {
       var entryIndex = predicateHashTableIndexForTriple(triple);;
 
       var entry = predicateHashTable[entryIndex];
@@ -103,7 +103,7 @@ module Segment {
     proc addTriple(triple: Triple): bool {
       if (isSegmentFull()) then return false;
 
-      var predicateEntry = add(triple);
+      var predicateEntry = getOrAddPredicateEntry(triple);
       if (predicateEntry) {
         predicateEntry.add(triple);
         totalTripleCount += 1;

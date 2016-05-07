@@ -10,11 +10,13 @@ module Common {
     var object: EntityId;
 
     proc toSOPair() {
-      return (subject << 32) | object;
+      var pair: EntityPair = subject;
+      return (pair << 32) | object;
     }
 
     proc toOSPair() {
-      return (object << 32) | subject;
+      var pair: EntityPair = object;
+      return (pair << 32) | subject;
     }
   }
 }
