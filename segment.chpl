@@ -58,6 +58,7 @@ module Segment {
         if (!found) {
           /*writeln("adding ", triple, " count = ", count, " on locale ", here.id);*/
           if (count >= soEntries.size) {
+            // TODO: optimize inserts
             soEntries.insert(count+entriesArrayIncrementCount, 0);
             osEntries.insert(count+entriesArrayIncrementCount, 0);
           }
@@ -90,7 +91,7 @@ module Segment {
       var entryPos = 0;
 
       inline proc hasValue(): bool {
-        /*return entryPos < entry.count;*/
+        // TODO: enable for S, O, SO, and OS scenarios
         var found = false;
         while (!found && (entryPos < entry.count)) {
           var soEntry = entry.soEntries[entryPos];
