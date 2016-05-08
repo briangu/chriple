@@ -2,7 +2,7 @@ module Common {
 
   type EntityId = uint(32);
   type EntityPair = uint(64);
-  type PredicateId = uint(32);
+  type PredicateId = EntityId;
 
   record Triple {
     var subject: EntityId;

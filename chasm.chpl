@@ -139,7 +139,7 @@ module Chasm {
 
     inline proc readPredicateIds() {
       var count = readCount();
-      var P: domain(1) = {1..count};
+      var P: domain(1) = {0..#count};
       var result: [P] PredicateId;
       for r in result do r = readPredicateId();
       return result;
@@ -147,7 +147,7 @@ module Chasm {
 
     inline proc readEntityIds() {
       var count = readCount();
-      var P: domain(1) = {1..count};
+      var P: domain(1) = {0..#count};
       var result: [P] PredicateId;
       for r in result do r = readEntityId();
       return result;

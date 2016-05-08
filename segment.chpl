@@ -94,8 +94,7 @@ module Segment {
           halt("iterated past end of triples", entry);
         }
 
-        var docId = entry.documentIds[entryPos];
-        return toTriple(entry.triples[entryPos], entry.predicate);
+        return toTriple(entry.soEntries[entryPos], entry.predicate);
       }
 
       inline proc advance() {
@@ -149,7 +148,7 @@ module Segment {
         entryIndex = (entryIndex + 1) % predicateHashTableCount;
         entry = predicateHashTable[entryIndex];
       }
-      return nil;
+      return entry;
     }
 
     inline proc isSegmentFull(count: int = 1): bool {
@@ -184,8 +183,12 @@ module Segment {
     }
 
     iter query(query: Query): QueryResult {
-      halt("not implemented");
-      yield new QueryResult();
+      var op = chasmInterpret(this, query.instructionBuffer);
+      if (op != nil) {
+        for triple in op.evaluate() {
+          yield new QueryResult(triple);
+        }
+      }
     }
 
     proc operandForScanPredicate(predicateIds: [?P] PredicateId, subjectIds: [?S] EntityId, objectIds: [?O] EntityId): Operand {

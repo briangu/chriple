@@ -38,7 +38,7 @@ module Operand {
       if (!hasValue()) {
         halt("iterated too far");
       }
-      return 0;
+      return new Triple(0,0,0);
     }
 
     inline proc advance() {
@@ -55,6 +55,14 @@ module Operand {
     }
   }
 
+
+      inline proc tripleComponentFromOperand(mode: OperandSPOMode, op: Operand): EntityId {
+        if mode == SPOModeSubject then return op.getValue().subject;
+        if mode == SPOModePredicate then return op.getValue().predicate;
+        if mode == SPOModeObject then return op.getValue().object;
+        halt("unsupported mode ", mode);
+      }
+
   class UnionOperand : Operand {
     var mode: OperandSPOMode;
     var opA: Operand;
@@ -65,8 +73,8 @@ module Operand {
       var op: Operand = nil;
 
       if (opA.hasValue() && opB.hasValue()) {
-        var docIndexA = (opA.getValue(): uint(32)); // & DocumentIndexDocIdMask;
-        var docIndexB = (opB.getValue(): uint(32)); // & DocumentIndexDocIdMask;
+        var docIndexA = tripleComponentFromOperand(mode, opA);
+        var docIndexB = tripleComponentFromOperand(mode, opB);
 
         if (docIndexA > docIndexB) {
           op = opA;
@@ -112,21 +120,17 @@ module Operand {
     var opB: Operand;
     var curOp: Operand = nextOperand();
 
-    inline proc documentIndexFromOperand(op: Operand): uint(32) {
-      return (op.getValue(): uint(32)); // & DocumentIndexDocIdMask;
-    }
-
     proc nextOperand(): Operand {
       var op: Operand = nil;
 
       while(opA.hasValue() && opB.hasValue()) {
-        var docIndexA = documentIndexFromOperand(opA);
-        var docIndexB = documentIndexFromOperand(opB);;
+        var docIndexA = tripleComponentFromOperand(mode, opA);
+        var docIndexB = tripleComponentFromOperand(mode, opB);
 
         if (docIndexA > docIndexB) {
           opA.advance();
         } else if (docIndexA == docIndexB) {
-          if ((curOp != nil) && (documentIndexFromOperand(curOp) == docIndexA)) {
+          if ((curOp != nil) && (tripleComponentFromOperand(mode, curOp) == docIndexA)) {
             if (curOp == opA) {
               opA.advance();
               op = opB;

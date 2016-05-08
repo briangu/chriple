@@ -58,9 +58,59 @@ proc addSyntheticData() {
   /*stopVdebug();*/
 }
 
+iter localQuery(query: Query) {
+  var lq: Query;
+  if (query.locale.id != here.id) {
+    var lq: Query = new Query(query);
+  } else {
+    lq = query;
+  }
+  local {
+    for res in Partitions[here.id].query(lq) {
+      yield res;
+    }
+  }
+}
+
+// serial iterator
+iter query(query: Query) {
+
+  var totalCounts = 0;
+  var outerResults: [0..(Locales.size * query.partitionLimit)-1] QueryResult;
+
+  for loc in Locales {
+    on loc {
+      // copy query into locale
+      var lq: Query = new Query(query);
+
+      var innerResults: [0..lq.partitionLimit-1] QueryResult;
+      var innerCount = 0;
+
+      local {
+        for res in localQuery(lq) {
+          innerResults[innerCount] = res;
+          innerCount += 1;
+          if (innerCount > innerResults.domain.high) {
+            break;
+          }
+        }
+      }
+
+      if (innerCount > 0) {
+        outerResults[totalCounts..totalCounts+innerCount-1] = innerResults[0..innerCount-1];
+        totalCounts += innerCount;
+      }
+    }
+  }
+
+  for i in 0..totalCounts-1 {
+    yield outerResults[i];
+  }
+}
+
 proc querySyntheticData() {
-  var query = new Query(new InstructionBuffer(2048));
-  var w = new InstructionWriter(query.instructionBuffer);
+  var q = new Query(new InstructionBuffer(2048));
+  var w = new InstructionWriter(q.instructionBuffer);
   // select * where s = 1 and p = 2 and o = 3
   //    --> on p, find all triples with s = 1 and o = 3 (which is at most 1)
   w.writeScanPredicate();
@@ -75,6 +125,10 @@ proc querySyntheticData() {
   w.writeObjectId(3);
 
   w.writeHalt();
+
+  for result in query(q) {
+    writeln(result);
+  }
 }
 
 proc dump() {
