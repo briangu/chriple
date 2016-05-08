@@ -41,7 +41,7 @@ proc addPredicateTriples(predicate: PredicateId, triples: [?D] Triple) {
 }
 
 proc addSyntheticData() {
-  startVdebug("add_triple");
+  /*startVdebug("add_triple");*/
   for p in 0..#predicateCount {
     writeln("adding predicate: ", p);
     var partitionId = partitionIdForPredicate(p:PredicateId);
@@ -55,7 +55,7 @@ proc addSyntheticData() {
       addPredicateTriples(p: PredicateId, triples);
     }
   }
-  stopVdebug();
+  /*stopVdebug();*/
 }
 
 proc dump() {
