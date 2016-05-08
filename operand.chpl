@@ -1,6 +1,6 @@
 module Operand {
 
-  /*use DocumentId;*/
+  use Common;
 
   /**
     Operand value is the value that represents the run-time, internal search results.
@@ -19,7 +19,13 @@ module Operand {
     and use it for document equivalent comparision between Operand values.
 
   */
-  type OperandValue = uint;
+  type OperandValue = Triple;
+  type OperandSPOMode = uint(8);
+
+  const SPOModeTriple = 0;
+  const SPOModeSubject = 1;
+  const SPOModePredicate = 2;
+  const SPOModeObject = 3;
 
   // Operand base class.  Also serves as Null / empty Operand
   // TODO: convert Operands to be proper Chapel iterators so we can iterate through the AST in parallel
@@ -50,6 +56,7 @@ module Operand {
   }
 
   class UnionOperand : Operand {
+    var mode: OperandSPOMode;
     var opA: Operand;
     var opB: Operand;
     var curOp: Operand = nextOperand();
@@ -100,6 +107,7 @@ module Operand {
   }
 
   class IntersectionOperand : Operand {
+    var mode: OperandSPOMode;
     var opA: Operand;
     var opB: Operand;
     var curOp: Operand = nextOperand();

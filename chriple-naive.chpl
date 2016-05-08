@@ -5,7 +5,7 @@
   does not make an effort to be super efficient with storage.
 
 */
-use Chasm, Common, GenHashKey32, Logging, Operand, Partition, PrivateDist, Segment, Time, VisualDebug;
+use Chasm, Common, GenHashKey32, Logging, Operand, Partition, PrivateDist, Query, Segment, Time, VisualDebug;
 
 config const subjectCount = 16;
 config const predicateCount = 8;
@@ -58,6 +58,25 @@ proc addSyntheticData() {
   /*stopVdebug();*/
 }
 
+proc querySyntheticData() {
+  var query = new Query(new InstructionBuffer(2048));
+  var w = new InstructionWriter(query.instructionBuffer);
+  // select * where s = 1 and p = 2 and o = 3
+  //    --> on p, find all triples with s = 1 and o = 3 (which is at most 1)
+  w.writeScanPredicate();
+  // list of predicates to scan
+  w.writeCount(1);
+  w.writePredicateId(2);
+  // list of subjects to scan
+  w.writeCount(1);
+  w.writeSubjectId(1);
+  // list of objects to scan
+  w.writeCount(1);
+  w.writeObjectId(3);
+
+  w.writeHalt();
+}
+
 proc dump() {
   for loc in Locales do on loc do for triple in Partitions[here.id].dump() do writeln(triple);
 }
@@ -69,5 +88,6 @@ proc main() {
 
   initPartitions();
   addSyntheticData();
+  querySyntheticData();
   /*dump();*/
 }

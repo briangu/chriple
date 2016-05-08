@@ -26,7 +26,7 @@ module Segment {
       yield new QueryResult();
     }
 
-    proc operandForTriple(triple: Triple): Operand {
+    proc operandForScanPredicate(predicateIds: [?P] PredicateId, subjectIds: [?S] EntityId, objectIds: [?O] EntityId): Operand {
       halt("not implemented");
       return NullOperand[here.id];
     }
@@ -45,6 +45,7 @@ module Segment {
     class PredicateEntry {
       var predicate: PredicateId;
       var initialEntryCount = 128*1024;
+      var entriesArrayIncrementCount = 100;
 
       var count: int;
       var soEntries: [0..#initialEntryCount] EntityPair;
@@ -57,8 +58,8 @@ module Segment {
         if (!found) {
           /*writeln("adding ", triple, " count = ", count, " on locale ", here.id);*/
           if (count >= soEntries.size) {
-            soEntries.insert(count+100, 0);
-            osEntries.insert(count+100, 0);
+            soEntries.insert(count+entriesArrayIncrementCount, 0);
+            osEntries.insert(count+entriesArrayIncrementCount, 0);
           }
           soEntries[count] = soEntry;
           osEntries[count] = triple.toOSPair();
@@ -79,12 +80,41 @@ module Segment {
       }
     }
 
+    class PredicateEntryOperand: Operand {
+      var segment: Segment;
+      var entry: PredicateEntry;
+      var entryPos = 0;
+
+      inline proc hasValue(): bool {
+        return entryPos < entry.count;
+      }
+
+      inline proc getValue(): OperandValue {
+        if (!hasValue()) {
+          halt("iterated past end of triples", entry);
+        }
+
+        var docId = entry.documentIds[entryPos];
+        return toTriple(entry.triples[entryPos], entry.predicate);
+      }
+
+      inline proc advance() {
+        if (!hasValue()) {
+          halt("iterated past end of triples", entry.predicate);
+        }
+        entryPos += 1;
+      }
+    }
+
     // Master table from triple -> tripleEntry -> Document posting list
     // This is a lock-free table and uses atomic PredicateEntryPoolIndex values to point to allocatiosn in the predicateEntryPool
     var predicateHashTable: [0..#predicateHashTableCount] PredicateEntry;
 
     inline proc predicateHashTableIndexForTriple(triple: Triple): int {
-      return genHashKey32(triple.predicate) % predicateHashTableCount;
+      return predicateHashTableIndexForPredicateId(triple.predicate);
+    }
+    inline proc predicateHashTableIndexForPredicateId(predicateId: PredicateId): int {
+      return genHashKey32(predicateId) % predicateHashTableCount;
     }
 
     proc getOrAddPredicateEntry(triple: Triple): PredicateEntry {
@@ -108,12 +138,12 @@ module Segment {
       return entry;
     }
 
-    proc get(triple: Triple): PredicateEntry {
+    proc getEntryForPredicateId(predicateId: PredicateId): PredicateEntry {
       // iterate through the entries starting at this table position
-      var entryIndex = predicateHashTableIndexForTriple(triple);
+      var entryIndex = predicateHashTableIndexForPredicateId(predicateId);
       var entry = predicateHashTable[entryIndex];
       while (entry != nil) {
-        if (entry.predicate == triple.predicate) {
+        if (entry.predicate == predicateId) {
           return entry;
         }
         entryIndex = (entryIndex + 1) % predicateHashTableCount;
@@ -158,9 +188,9 @@ module Segment {
       yield new QueryResult();
     }
 
-    proc operandForTriple(triple: Triple): Operand {
-      halt("not implemented");
-      return NullOperand[here.id];
+    proc operandForScanPredicate(predicateIds: [?P] PredicateId, subjectIds: [?S] EntityId, objectIds: [?O] EntityId): Operand {
+      var entry = getEntryForPredicateId(predicateIds[0]); // TODO: turn array into list of entries
+      return if (entry != nil) then new PredicateEntryOperand(this, entry) else NullOperand[here.id];
     }
 
     proc optimize() {
