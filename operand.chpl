@@ -55,13 +55,12 @@ module Operand {
     }
   }
 
-
-      inline proc tripleComponentFromOperand(mode: OperandSPOMode, op: Operand): EntityId {
-        if mode == SPOModeSubject then return op.getValue().subject;
-        if mode == SPOModePredicate then return op.getValue().predicate;
-        if mode == SPOModeObject then return op.getValue().object;
-        halt("unsupported mode ", mode);
-      }
+  inline proc tripleComponentFromOperand(mode: OperandSPOMode, op: Operand): EntityId {
+    if mode == SPOModeSubject then return op.getValue().subject;
+    if mode == SPOModePredicate then return op.getValue().predicate;
+    if mode == SPOModeObject then return op.getValue().object;
+    halt("unsupported mode ", mode);
+  }
 
   class UnionOperand : Operand {
     var mode: OperandSPOMode;

@@ -110,24 +110,45 @@ iter query(query: Query) {
 
 proc querySyntheticData() {
   var q = new Query(new InstructionBuffer(2048));
-  var w = new InstructionWriter(q.instructionBuffer);
-  // select * where s = 1 and p = 2 and o = 3
-  //    --> on p, find all triples with s = 1 and o = 3 (which is at most 1)
-  w.writeScanPredicate();
-  // list of predicates to scan
-  w.writeCount(1);
-  w.writePredicateId(2);
-  // list of subjects to scan
-  w.writeCount(1);
-  w.writeSubjectId(1);
-  // list of objects to scan
-  w.writeCount(1);
-  w.writeObjectId(3);
+  {
+    var w = new InstructionWriter(q.instructionBuffer);
+    // select * where s = 1 and p = 2 and o = 3
+    //    --> on p, find all triples with s = 1 and o = 3 (which is at most 1)
+    w.writeScanPredicate();
+    // list of predicates to scan
+    w.writeCount(1);
+    w.writePredicateId(2);
+    // list of subjects to scan
+    w.writeCount(1);
+    w.writeSubjectId(1);
+    // list of objects to scan
+    w.writeCount(1);
+    w.writeObjectId(3);
 
-  w.writeHalt();
+    w.writeHalt();
 
-  for result in query(q) {
-    writeln(result);
+    for result in query(q) do writeln(result);
+  }
+  q.instructionBuffer.clear();
+  {
+    var w = new InstructionWriter(q.instructionBuffer);
+    // select * where s = 1 and p = 2 and o = 3
+    //    --> on p, find all triples with s = 1 and o = 3 (which is at most 1)
+    w.writeScanPredicate();
+    // list of predicates to scan
+    w.writeCount(1);
+    w.writePredicateId(2);
+    // list of subjects to scan
+    w.writeCount(1);
+    w.writeSubjectId(1);
+    // list of objects to scan
+    w.writeCount(2);
+    w.writeObjectId(3);
+    w.writeObjectId(4);
+
+    w.writeHalt();
+
+    for result in query(q) do writeln(result);
   }
 }
 

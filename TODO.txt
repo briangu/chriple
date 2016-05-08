@@ -1,0 +1,2 @@
+full predicate scan
+optimized predicate scan for O and S, and SO (S-dominated) and OS (O-dominated) combinations

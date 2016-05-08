@@ -83,10 +83,32 @@ module Segment {
     class PredicateEntryOperand: Operand {
       var segment: Segment;
       var entry: PredicateEntry;
+      var subjectIdCount: int;
+      var subjectIds: [0..#subjectIdCount] EntityId;
+      var objectIdCount: int;
+      var objectIds: [0..#objectIdCount] EntityId;
       var entryPos = 0;
 
       inline proc hasValue(): bool {
-        return entryPos < entry.count;
+        /*return entryPos < entry.count;*/
+        var found = false;
+        while (!found && (entryPos < entry.count)) {
+          var soEntry = entry.soEntries[entryPos];
+          for s in subjectIds {
+            if ((soEntry >> 32):EntityId == s) {
+              for o in objectIds {
+                if (soEntry:EntityId == o) {
+                  found = true;
+                  break;
+                }
+              }
+              if (found) then break;
+            }
+          }
+          if (found) then break;
+          entryPos += 1;
+        }
+        return found;
       }
 
       inline proc getValue(): OperandValue {
@@ -193,7 +215,7 @@ module Segment {
 
     proc operandForScanPredicate(predicateIds: [?P] PredicateId, subjectIds: [?S] EntityId, objectIds: [?O] EntityId): Operand {
       var entry = getEntryForPredicateId(predicateIds[0]); // TODO: turn array into list of entries
-      return if (entry != nil) then new PredicateEntryOperand(this, entry) else NullOperand[here.id];
+      return if (entry != nil) then new PredicateEntryOperand(this, entry, subjectIds.size, subjectIds, objectIds.size, objectIds) else NullOperand[here.id];
     }
 
     proc optimize() {
