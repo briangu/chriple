@@ -10,6 +10,10 @@ module Partition {
       return segment.addTriple(triple);
     }
 
+    proc addTriples(triples: [?D] Triple): bool {
+      return segment.addTriples(triples);
+    }
+
     iter query(query: Query): QueryResult {
       for opValue in segment.query(query) do yield opValue;
     }

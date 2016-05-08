@@ -6,12 +6,17 @@ module Segment {
   var NullOperand: [PrivateSpace] Operand;
 
   class Segment {
-    inline proc isSegmentFull(): bool {
+    inline proc isSegmentFull(count: int = 1): bool {
       halt("not implemented");
       return true;
     }
 
     proc addTriple(triple: Triple): bool {
+      halt("not implemented");
+      return false;
+    }
+
+    proc addTriples(triples: [?D] Triple): bool {
       halt("not implemented");
       return false;
     }
@@ -39,31 +44,37 @@ module Segment {
 
     class PredicateEntry {
       var predicate: PredicateId;
+      var initialEntryCount = 128*1024;
 
       var count: int;
-      var soEntries: [0..#1024] EntityPair;
-      var osEntries: [0..#1024] EntityPair;
+      var soEntries: [0..#initialEntryCount] EntityPair;
+      var osEntries: [0..#initialEntryCount] EntityPair;
 
-      proc add(triple: Triple) {
+      inline proc add(triple: Triple) {
         var soEntry = triple.toSOPair();
-        var (found,idx) = soEntries.find(soEntry);
+        /*var (found,idx) = soEntries.find(soEntry);*/
+        const found = false;
         if (!found) {
-          writeln("adding ", triple, " count = ", count, " on locale ", here.id);
+          /*writeln("adding ", triple, " count = ", count, " on locale ", here.id);*/
+          if (count >= soEntries.size) {
+            soEntries.insert(count+100, 0);
+            osEntries.insert(count+100, 0);
+          }
           soEntries[count] = soEntry;
           osEntries[count] = triple.toOSPair();
           count += 1;
         } else {
-          writeln("found ", triple);
+          /*writeln("found ", triple);*/
         }
       }
 
       proc optimize() {
         QuickSort(soEntries[0..#count]);
         QuickSort(osEntries[0..#count]);
+        // TODO: remove duplicates
       }
 
       iter dump(): Triple {
-        writeln(soEntries[0..#count], " count = ", count);
         for i in 0..#count do yield toTriple(soEntries[i], predicate);
       }
     }
@@ -77,20 +88,22 @@ module Segment {
     }
 
     proc getOrAddPredicateEntry(triple: Triple): PredicateEntry {
-      var entryIndex = predicateHashTableIndexForTriple(triple);;
+      var entry: PredicateEntry;
 
-      var entry = predicateHashTable[entryIndex];
-      while (predicateHashTable[entryIndex] != nil) {
-        if (entry.predicate == triple.predicate) {
-          return entry;
-        }
-        entryIndex = (entryIndex + 1) % predicateHashTableCount;
+      local {
+        var entryIndex = predicateHashTableIndexForTriple(triple);;
         entry = predicateHashTable[entryIndex];
-      }
+        while (predicateHashTable[entryIndex] != nil) {
+          if (entry.predicate == triple.predicate) {
+            return entry;
+          }
+          entryIndex = (entryIndex + 1) % predicateHashTableCount;
+          entry = predicateHashTable[entryIndex];
+        }
 
-      entry = new PredicateEntry(triple.predicate);;
-      predicateHashTable[entryIndex] = entry;
-      /*entry.count += 1;*/
+        entry = new PredicateEntry(triple.predicate);
+        predicateHashTable[entryIndex] = entry;
+      }
 
       return entry;
     }
@@ -109,23 +122,35 @@ module Segment {
       return nil;
     }
 
-    inline proc isSegmentFull(): bool {
+    inline proc isSegmentFull(count: int = 1): bool {
       return false;
     }
 
     proc addTriple(triple: Triple): bool {
-      {
-        if (isSegmentFull()) then return false;
-
-        var predicateEntry = getOrAddPredicateEntry(triple);
-        if (predicateEntry) {
-          predicateEntry.add(triple);
-          totalTripleCount += 1;
-          return true;
-        }
-
-        return false;
+      if (isSegmentFull()) then return false;
+      var predicateEntry = getOrAddPredicateEntry(triple);
+      if (predicateEntry) {
+        predicateEntry.add(triple);
+        totalTripleCount += 1;
+        return true;
       }
+
+      return false;
+    }
+
+    proc addTriples(triples: [?D] Triple): bool {
+      if (isSegmentFull(triples.size)) then return false;
+
+      const startCount = totalTripleCount;
+
+      for triple in triples {
+        var predicateEntry = getOrAddPredicateEntry(triple);
+        if (predicateEntry == nil) then break;
+        predicateEntry.add(triple);
+        totalTripleCount += 1;
+      }
+
+      return (totalTripleCount - startCount) == triples.size;
     }
 
     iter query(query: Query): QueryResult {
