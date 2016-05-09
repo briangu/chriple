@@ -39,8 +39,10 @@ module Segment {
   class NaiveMemorySegment : Segment {
 
     var totalTripleCount: int;
+    var totalPredicateCount: int;
 
     const predicateHashTableCount: uint(32) = 1024 * 32;
+    var predicateHashTable: [0..#predicateHashTableCount] PredicateEntry;
 
     class PredicateEntry {
       var predicate: PredicateId;
@@ -82,7 +84,6 @@ module Segment {
     }
 
     class PredicateEntryOperand: Operand {
-      var segment: Segment;
       var entry: PredicateEntry;
       var subjectIdCount: int;
       var subjectIds: [0..#subjectIdCount] EntityId;
@@ -113,24 +114,57 @@ module Segment {
       }
 
       inline proc getValue(): OperandValue {
-        if (!hasValue()) {
-          halt("iterated past end of triples", entry);
-        }
-
+        if (!hasValue()) then halt("iterated past end of triples", entry);
         return toTriple(entry.soEntries[entryPos], entry.predicate);
       }
 
       inline proc advance() {
-        if (!hasValue()) {
-          halt("iterated past end of triples", entry.predicate);
-        }
+        if (!hasValue()) then halt("iterated past end of triples", entry.predicate);
         entryPos += 1;
       }
     }
 
-    // Master table from triple -> tripleEntry -> Document posting list
-    // This is a lock-free table and uses atomic PredicateEntryPoolIndex values to point to allocatiosn in the predicateEntryPool
-    var predicateHashTable: [0..#predicateHashTableCount] PredicateEntry;
+    class MultiPredicateEntryOperand: Operand {
+      var predicateIdCount: int;
+      var predicateIds: [0..#predicateIdCount] PredicateId;
+      var subjectIdCount: int;
+      var subjectIds: [0..#subjectIdCount] EntityId;
+      var objectIdCount: int;
+      var objectIds: [0..#objectIdCount] EntityId;
+
+      var entryPos = 0;
+      var operand: PredicateEntryOperand;
+      var predicateIdPos: int;
+
+      inline proc hasValue(): bool {
+        if operand == nil {
+          while (operand == nil && predicateIdPos < predicateIdCount) {
+            var entry = getEntryForPredicateId(predicateIds[predicateIdPos]);
+            if (entry != nil) {
+              operand = new PredicateEntryOperand(entry, subjectIdCount, subjectIds, objectIdCount, objectIds);
+            }
+            predicateIdPos += 1;
+          }
+          if operand == nil then return false;
+        }
+        var found = operand.hasValue();
+        if !found {
+          delete operand;
+          operand = nil;
+        }
+        return found;
+      }
+
+      inline proc getValue(): OperandValue {
+        if operand == nil then halt("MultiPredicateEntryOperand::getValue operand == nil");
+        return operand.getValue();
+      }
+
+      inline proc advance() {
+        if operand == nil then halt("MultiPredicateEntryOperand::advance operand == nil");
+        operand.advance();
+      }
+    }
 
     inline proc predicateHashTableIndexForTriple(triple: Triple): int {
       return predicateHashTableIndexForPredicateId(triple.predicate);
@@ -155,6 +189,7 @@ module Segment {
 
         entry = new PredicateEntry(triple.predicate);
         predicateHashTable[entryIndex] = entry;
+        totalPredicateCount += 1;
       }
 
       return entry;
@@ -215,8 +250,20 @@ module Segment {
     }
 
     proc operandForScanPredicate(predicateIds: [?P] PredicateId, subjectIds: [?S] EntityId, objectIds: [?O] EntityId): Operand {
-      var entry = getEntryForPredicateId(predicateIds[0]); // TODO: turn array into list of entries
-      return if (entry != nil) then new PredicateEntryOperand(this, entry, subjectIds.size, subjectIds, objectIds.size, objectIds) else NullOperand[here.id];
+      if predicateIds.size == 0 {
+        var allPredicateIds: [0..#totalPredicateCount] PredicateId;
+        var idx: int;
+        for i in predicateHashTable.domain {
+          var entry = predicateHashTable[i];
+          if entry != nil {
+            allPredicateIds[idx] = entry.predicate;
+            idx += 1;
+          }
+        }
+        return new MultiPredicateEntryOperand(totalPredicateCount, allPredicateIds, subjectIds.size, subjectIds, objectIds.size, objectIds);
+      } else {
+        return new MultiPredicateEntryOperand(predicateIds.size, predicateIds, subjectIds.size, subjectIds, objectIds.size, objectIds);
+      }
     }
 
     proc optimize() {
