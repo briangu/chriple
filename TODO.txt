@@ -1,5 +1,5 @@
-full predicate scan
-enable predicate scan for O and S, and SO (S-dominated) and OS (O-dominated) combinations
+[x] full predicate scan
+[x] enable predicate scan for O and S, and SO (S-dominated) and OS (O-dominated) combinations
 validate AND and OR SPO modes
 subgraph extraction
 binary search into entries
