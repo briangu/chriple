@@ -95,27 +95,66 @@ module Segment {
         // TODO: enable for S, O, SO, and OS scenarios
         var found = false;
         while (!found && (entryPos < entry.count)) {
-          var soEntry = entry.soEntries[entryPos];
-          for s in subjectIds {
-            if ((soEntry >> 32):EntityId == s) {
-              for o in objectIds {
-                if (soEntry:EntityId == o) {
+          if (subjectIdCount > 0) {
+            if (objectIdCount > 0) {
+              // TODO: if objectIdCount > subjectIdCount then bias to osEntries
+              var sEntry = (entry.soEntries[entryPos] >> 32):EntityId;
+              for s in subjectIds {
+                if (sEntry == s) {
+                  var oEntry = entry.soEntries[entryPos]: EntityId;
+                  for o in objectIds {
+                    if (oEntry == o) {
+                      found = true;
+                      break;
+                    }
+                  }
+                  if (found) then break;
+                }
+              }
+              if (found) then break;
+              entryPos += 1;
+            } else {
+              var sEntry = (entry.soEntries[entryPos] >> 32):EntityId;
+              for s in subjectIds {
+                if (sEntry == s) {
                   found = true;
                   break;
                 }
               }
               if (found) then break;
+              entryPos += 1;
+            }
+          } else {
+            if (objectIdCount > 0) {
+              var oEntry = (entry.osEntries[entryPos] >> 32):EntityId;
+              for o in objectIds {
+                if (oEntry == o) {
+                  found = true;
+                  break;
+                }
+              }
+              if (found) then break;
+              entryPos += 1;
+            } else {
+              // both subjectIds and objectIds are not specified so just scan through all soEntries
+              found = true;
             }
           }
-          if (found) then break;
-          entryPos += 1;
         }
         return found;
       }
 
       inline proc getValue(): OperandValue {
         if (!hasValue()) then halt("iterated past end of triples", entry);
-        return toTriple(entry.soEntries[entryPos], entry.predicate);
+        if (subjectIdCount > 0) {
+          return toTriple(entry.soEntries[entryPos], entry.predicate);
+        } else {
+          if (objectIdCount > 0) {
+            return toTripleFromOSEntry(entry.osEntries[entryPos], entry.predicate);
+          } else {
+            return toTriple(entry.soEntries[entryPos], entry.predicate);
+          }
+        }
       }
 
       inline proc advance() {
@@ -148,10 +187,10 @@ module Segment {
           if operand == nil then return false;
         }
         var found = operand.hasValue();
-        if !found {
+        /*if !found {
           delete operand;
           operand = nil;
-        }
+        }*/
         return found;
       }
 
@@ -163,6 +202,10 @@ module Segment {
       inline proc advance() {
         if operand == nil then halt("MultiPredicateEntryOperand::advance operand == nil");
         operand.advance();
+        if (!operand.hasValue()) {
+          delete operand;
+          operand = nil;
+        }
       }
     }
 
