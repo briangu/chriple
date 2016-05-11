@@ -222,11 +222,6 @@ proc querySyntheticData() {
     w.writeCount(0);
     w.writeHalt();
 
-    var expected: [0..#totalTripleCount] Triple;
-    var subjectStride = predicateCount * objectCount;
-    var predicateStride = objectCount;
-    var objectStride = 1;
-
     writeln("scan all triples");
     verifyTriples(0..#subjectCount, 0..#predicateCount, 0..#objectCount, q);
   }
