@@ -296,7 +296,7 @@ module Chasm {
       var op = reader.read();
       select op {
         when CHASM_HALT           do break;
-        when CHASM_SCAN_PREDICATE do push(segment.operandForScanPredicate(reader.readPredicateIds(), reader.readSubjectIds(), reader.readObjectIds()));
+        when CHASM_SCAN_PREDICATE do push(segment.operandForScanPredicate(reader.readSubjectIds(), reader.readPredicateIds(), reader.readObjectIds()));
         when CHASM_AND            do push(new IntersectionOperand(reader.readSPOMode(), pop(), pop()));
         when CHASM_OR             do push(new UnionOperand(reader.readSPOMode(), pop(), pop()));
       }

@@ -2,7 +2,7 @@
 [x] enable predicate scan for O and S, and SO (S-dominated) and OS (O-dominated) combinations
 validate AND and OR SPO modes
 subgraph extraction
-binary search into entries
+optimize S/O binary search into entries
 
 remove duplicates
 optimize inserts

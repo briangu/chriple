@@ -26,7 +26,7 @@ module Segment {
       yield new QueryResult();
     }
 
-    proc operandForScanPredicate(predicateIds: [?P] PredicateId, subjectIds: [?S] EntityId, objectIds: [?O] EntityId): Operand {
+    proc operandForScanPredicate(subjectIds: [?S] EntityId, predicateIds: [?P] PredicateId, objectIds: [?O] EntityId): Operand {
       halt("not implemented");
       return NullOperand[here.id];
     }
@@ -91,6 +91,9 @@ module Segment {
       var objectIds: [0..#objectIdCount] EntityId;
       var entryPos = 0;
 
+      // TODO: this code is too naive, even for a naive impl.
+      //        e.g. we should leverage the fact that the entry arrays are sorted
+      //             don't keep searching for subjects which are already found...
       inline proc hasValue(): bool {
         // TODO: enable for S, O, SO, and OS scenarios
         var found = false;
@@ -292,7 +295,7 @@ module Segment {
       }
     }
 
-    proc operandForScanPredicate(predicateIds: [?P] PredicateId, subjectIds: [?S] EntityId, objectIds: [?O] EntityId): Operand {
+    proc operandForScanPredicate(subjectIds: [?S] EntityId, predicateIds: [?P] PredicateId, objectIds: [?O] EntityId): Operand {
       if predicateIds.size == 0 {
         var allPredicateIds: [0..#totalPredicateCount] PredicateId;
         var idx: int;

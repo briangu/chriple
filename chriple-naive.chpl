@@ -10,6 +10,7 @@ use Chasm, Common, GenHashKey32, Logging, Operand, Partition, PrivateDist, Query
 config const subjectCount = 16;
 config const predicateCount = 8;
 config const objectCount = 16;
+const totalTripleCount = subjectCount * predicateCount * objectCount;
 
 proc initPartitions() {
   var t: Timer;
@@ -108,19 +109,40 @@ iter query(query: Query) {
   }
 }
 
+proc verifyTriples(sRange, pRange, oRange, q: Query) {
+  var tuples: [sRange, pRange, oRange] bool;
+  for s in sRange {
+    for p in pRange {
+      for o in oRange {
+        tuples[s,p,o] = true;
+      }
+    }
+  }
+
+  for result in query(q) {
+    var t = result.triple;
+    if (t.subject < sRange.low && t.subject > sRange.high) then halt("t.subject < sRange.low && t.subject > sRange.high");
+    if (t.predicate < pRange.low && t.predicate > pRange.high) then halt("t.predicate < pRange.low && t.predicate > pRange.high");
+    if (t.object < oRange.low && t.object > oRange.high) then halt("t.object < oRange.low && t.object > oRange.high");
+
+    if (!tuples[t.subject, t.predicate, t.object]) then halt("tuple not found: ", t);
+  }
+}
+
 proc querySyntheticData() {
   var q = new Query(new InstructionBuffer(2048));
   {
+    q.instructionBuffer.clear();
     var w = new InstructionWriter(q.instructionBuffer);
     // select * where s = 1 and p = 2 and o = 3
     //    --> on p, find all triples with s = 1 and o = 3 (which is at most 1)
     w.writeScanPredicate();
-    // list of predicates to scan
-    w.writeCount(1);
-    w.writePredicateId(2);
     // list of subjects to scan
     w.writeCount(1);
     w.writeSubjectId(1);
+    // list of predicates to scan
+    w.writeCount(1);
+    w.writePredicateId(2);
     // list of objects to scan
     w.writeCount(1);
     w.writeObjectId(3);
@@ -128,71 +150,71 @@ proc querySyntheticData() {
     w.writeHalt();
 
     writeln("triples of (1,2,3)");
-    for result in query(q) do writeln(result);
+    verifyTriples(1..1, 2..2, 3..3, q);
   }
 
-  q.instructionBuffer.clear();
   {
+    q.instructionBuffer.clear();
     var w = new InstructionWriter(q.instructionBuffer);
     w.writeScanPredicate();
     w.writeCount(1);
-    w.writePredicateId(2);
-    w.writeCount(1);
     w.writeSubjectId(1);
+    w.writeCount(1);
+    w.writePredicateId(2);
     w.writeCount(2);
     w.writeObjectId(3);
     w.writeObjectId(4);
     w.writeHalt();
 
     writeln("triples of (1,2,[3,4])");
-    for result in query(q) do writeln(result);
+    verifyTriples(1..1, 2..2, 3..4, q);
   }
-  q.instructionBuffer.clear();
   {
+    q.instructionBuffer.clear();
     var w = new InstructionWriter(q.instructionBuffer);
     w.writeScanPredicate();
-    w.writeCount(0);
     w.writeCount(1);
     w.writeSubjectId(1);
+    w.writeCount(0);
     w.writeCount(2);
     w.writeObjectId(3);
     w.writeObjectId(4);
     w.writeHalt();
 
     writeln("scan all triples of the form (1,*,[3,4])");
-    for result in query(q) do writeln(result);
+    verifyTriples(1..1, 0..#predicateCount, 3..4, q);
   }
-  q.instructionBuffer.clear();
   {
+    q.instructionBuffer.clear();
     var w = new InstructionWriter(q.instructionBuffer);
     w.writeScanPredicate();
+    w.writeCount(0);
     w.writeCount(1);
     w.writePredicateId(2);
-    w.writeCount(0);
     w.writeCount(2);
     w.writeObjectId(3);
     w.writeObjectId(4);
     w.writeHalt();
 
     writeln("scan all triples of the form (*,2,[3,4])");
-    for result in query(q) do writeln(result);
+    verifyTriples(0..#subjectCount, 2..2, 3..4, q);
   }
-  q.instructionBuffer.clear();
   {
+    q.instructionBuffer.clear();
     var w = new InstructionWriter(q.instructionBuffer);
     w.writeScanPredicate();
     w.writeCount(1);
-    w.writePredicateId(2);
-    w.writeCount(1);
     w.writeSubjectId(1);
+    w.writeCount(1);
+    w.writePredicateId(2);
     w.writeCount(0);
     w.writeHalt();
 
     writeln("scan all triples of the form (1,2,*])");
-    for result in query(q) do writeln(result);
+    verifyTriples(1..1, 2..2, 0..#objectCount, q);
   }
-  /*q.instructionBuffer.clear();
   {
+    q.instructionBuffer.clear();
     var w = new InstructionWriter(q.instructionBuffer);
     w.writeScanPredicate();
     w.writeCount(0);
@@ -200,9 +222,14 @@ proc querySyntheticData() {
     w.writeCount(0);
     w.writeHalt();
 
+    var expected: [0..#totalTripleCount] Triple;
+    var subjectStride = predicateCount * objectCount;
+    var predicateStride = objectCount;
+    var objectStride = 1;
+
     writeln("scan all triples");
-    for result in query(q) do writeln(result);
-  }*/
+    verifyTriples(0..#subjectCount, 0..#predicateCount, 0..#objectCount, q);
+  }
 }
 
 proc dump() {
