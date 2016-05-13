@@ -1,6 +1,6 @@
 module Operand {
 
-  use Common;
+  use Common, PrivateDist;
 
   /**
     Operand value is the value that represents the run-time, internal search results.
