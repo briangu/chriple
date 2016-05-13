@@ -22,10 +22,10 @@ module Operand {
   type OperandValue = Triple;
   type OperandSPOMode = uint(8);
 
-  const SPOModeTriple = 0;
-  const SPOModeSubject = 1;
-  const SPOModePredicate = 2;
-  const SPOModeObject = 3;
+  const OperandSPOModeTriple = 0: OperandSPOMode;
+  const OperandSPOModeSubject = 1: OperandSPOMode;
+  const OperandSPOModePredicate = 2: OperandSPOMode;
+  const OperandSPOModeObject = 3: OperandSPOMode;
 
   // Operand base class.  Also serves as Null / empty Operand
   // TODO: convert Operands to be proper Chapel iterators so we can iterate through the AST in parallel
@@ -56,9 +56,9 @@ module Operand {
   }
 
   inline proc tripleComponentFromOperand(mode: OperandSPOMode, op: Operand): EntityId {
-    if mode == SPOModeSubject then return op.getValue().subject;
-    if mode == SPOModePredicate then return op.getValue().predicate;
-    if mode == SPOModeObject then return op.getValue().object;
+    if mode == OperandSPOModeSubject then return op.getValue().subject;
+    if mode == OperandSPOModePredicate then return op.getValue().predicate;
+    if mode == OperandSPOModeObject then return op.getValue().object;
     halt("unsupported mode ", mode);
   }
 

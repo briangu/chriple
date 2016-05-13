@@ -1,6 +1,6 @@
 module Segment {
 
-  use Common, GenHashKey32, ObjectPool, Operand, PrivateDist, Sort, Query;
+  use Common, GenHashKey32, Logging, ObjectPool, Operand, PrivateDist, Sort, Query;
 
   // Globally reusable Null / empty singleton operand
   var NullOperand: [PrivateSpace] Operand;
@@ -90,12 +90,21 @@ module Segment {
       var objectIdCount: int;
       var objectIds: [0..#objectIdCount] EntityId;
       var entryPos = 0;
+      var needAdvance = true;
+      var lastFound = false;
 
       // TODO: this code is too naive, even for a naive impl.
       //        e.g. we should leverage the fact that the entry arrays are sorted
       //             don't keep searching for subjects which are already found...
       inline proc hasValue(): bool {
+        if (!needAdvance) {
+          /*info("PredicateEntryOperand hasValue() ", entry.predicate, " ", lastFound);*/
+          return lastFound;
+        }
+
+        /*info("PredicateEntryOperand hasValue() ", entry.predicate);*/
         // TODO: enable for S, O, SO, and OS scenarios
+        // TODO: this method should be idempotent
         var found = false;
         while (!found && (entryPos < entry.count)) {
           if (subjectIdCount > 0) {
@@ -144,11 +153,15 @@ module Segment {
             }
           }
         }
+        lastFound = found;
+        needAdvance = false;
+        /*info("PredicateEntryOperand hasValue() out ", entry.predicate, " ", lastFound);*/
         return found;
       }
 
       inline proc getValue(): OperandValue {
-        if (!hasValue()) then halt("iterated past end of triples", entry);
+        /*info("PredicateEntryOperand getValue() ", entry.predicate);*/
+        if (!hasValue()) then halt("iterated past end of triples ", entry.predicate);
         if (subjectIdCount > 0) {
           return toTriple(entry.soEntries[entryPos], entry.predicate);
         } else {
@@ -161,8 +174,10 @@ module Segment {
       }
 
       inline proc advance() {
+        /*info("PredicateEntryOperand advance() ", entry.predicate);*/
         if (!hasValue()) then halt("iterated past end of triples", entry.predicate);
         entryPos += 1;
+        needAdvance = true;
       }
     }
 
@@ -179,6 +194,11 @@ module Segment {
       var predicateIdPos: int;
 
       inline proc hasValue(): bool {
+        if (operand != nil) {
+          /*writeln("MultiPredicateEntryOperand hasValue() ", operand.entry.predicate);*/
+        } else {
+          /*writeln("MultiPredicateEntryOperand hasValue() ", predicateIds);*/
+        }
         if operand == nil {
           while (operand == nil && predicateIdPos < predicateIdCount) {
             var entry = getEntryForPredicateId(predicateIds[predicateIdPos]);
@@ -189,6 +209,7 @@ module Segment {
           }
           if operand == nil then return false;
         }
+        /*writeln("MultiPredicateEntryOperand hasValue() new operand ", operand.entry.predicate);*/
         var found = operand.hasValue();
         /*if !found {
           delete operand;
@@ -198,11 +219,13 @@ module Segment {
       }
 
       inline proc getValue(): OperandValue {
+        /*writeln("MultiPredicateEntryOperand getValue() ", operand.entry.predicate);*/
         if operand == nil then halt("MultiPredicateEntryOperand::getValue operand == nil");
         return operand.getValue();
       }
 
       inline proc advance() {
+        /*writeln("MultiPredicateEntryOperand advance() ", operand.entry.predicate);*/
         if operand == nil then halt("MultiPredicateEntryOperand::advance operand == nil");
         operand.advance();
         if (!operand.hasValue()) {
@@ -306,7 +329,18 @@ module Segment {
             idx += 1;
           }
         }
-        return new MultiPredicateEntryOperand(totalPredicateCount, allPredicateIds, subjectIds.size, subjectIds, objectIds.size, objectIds);
+        if (idx > 0) {
+          return new MultiPredicateEntryOperand(idx, allPredicateIds, subjectIds.size, subjectIds, objectIds.size, objectIds);
+        } else {
+          return NullOperand[here.id];
+        }
+      } else if (predicateIds.size == 1) {
+        var entry = getEntryForPredicateId(predicateIds[0]);
+        if (entry != nil) {
+          return new PredicateEntryOperand(entry, subjectIds.size, subjectIds, objectIds.size, objectIds);
+        } else {
+          return NullOperand[here.id];
+        }
       } else {
         return new MultiPredicateEntryOperand(predicateIds.size, predicateIds, subjectIds.size, subjectIds, objectIds.size, objectIds);
       }

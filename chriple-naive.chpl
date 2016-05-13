@@ -10,6 +10,8 @@ use Chasm, Common, GenHashKey32, Logging, Operand, Partition, PrivateDist, Query
 config const subjectCount = 16;
 config const predicateCount = 8;
 config const objectCount = 16;
+config const verify_print = false;
+
 const totalTripleCount = subjectCount * predicateCount * objectCount;
 
 proc initPartitions() {
@@ -109,6 +111,12 @@ iter query(query: Query) {
   }
 }
 
+proc printTriples(q: Query) {
+  for result in query(q) {
+    writeln(result.triple);
+  }
+}
+
 proc verifyTriples(sRange, pRange, oRange, q: Query) {
   var tuples: [sRange, pRange, oRange] bool;
   for s in sRange {
@@ -121,12 +129,30 @@ proc verifyTriples(sRange, pRange, oRange, q: Query) {
 
   for result in query(q) {
     var t = result.triple;
+    if (verify_print) then writeln(t);
+
     if (t.subject < sRange.low && t.subject > sRange.high) then halt("t.subject < sRange.low && t.subject > sRange.high");
     if (t.predicate < pRange.low && t.predicate > pRange.high) then halt("t.predicate < pRange.low && t.predicate > pRange.high");
     if (t.object < oRange.low && t.object > oRange.high) then halt("t.object < oRange.low && t.object > oRange.high");
 
     if (!tuples[t.subject, t.predicate, t.object]) then halt("tuple not found: ", t);
+
+    // mark the tuple as touched
+    tuples[t.subject, t.predicate, t.object] = false;
   }
+
+  var failed = false;
+  for s in sRange {
+    for p in pRange {
+      for o in oRange {
+        if (tuples[s,p,o]) {
+          writeln(" (", s, " ", p, " ", o, ") was not verified.");
+          failed = true;
+        }
+      }
+    }
+  }
+  if (failed) then halt("found tuples which were not verified.");
 }
 
 proc querySyntheticData() {
@@ -224,6 +250,41 @@ proc querySyntheticData() {
 
     writeln("scan all triples");
     verifyTriples(0..#subjectCount, 0..#predicateCount, 0..#objectCount, q);
+  }
+  {
+    q.instructionBuffer.clear();
+    var w = new InstructionWriter(q.instructionBuffer);
+    // A = (*,2,3)
+    w.writeScanPredicate();
+    w.writeCount(4);
+    w.writeSubjectId(1);
+    w.writeSubjectId(2);
+    w.writeSubjectId(3);
+    w.writeSubjectId(4);
+    w.writeCount(1);
+    w.writePredicateId(2);
+    w.writeCount(1);
+    w.writeObjectId(3);
+
+    // B = ([2,3],3,4)
+    w.writeScanPredicate();
+    w.writeCount(2);
+    w.writeSubjectId(2);
+    w.writeSubjectId(3);
+    w.writeCount(1);
+    w.writePredicateId(2);
+    w.writeCount(1);
+    w.writeSubjectId(4);
+
+    // A.object AND B.object
+    w.writeAnd();
+    w.writeSPOMode(OperandSPOModeSubject);
+
+    w.writeHalt();
+
+    writeln("scan all triples of the form (2..3, 2..3, 3..4)");
+    printTriples(q);
+    /*verifyTriples(2..3, 2..3, 3..4, q);*/
   }
 }
 
