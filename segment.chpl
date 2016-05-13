@@ -168,18 +168,19 @@ module Segment {
   class MultiPredicateEntryOperand: Operand {
     var entryCount: int;
     var entries: [0..#entryCount] PredicateEntry;
-    var predicateIdCount: int;
-    var predicateIds: [0..#predicateIdCount] PredicateId;
     var subjectIdCount: int;
     var subjectIds: [0..#subjectIdCount] EntityId;
     var objectIdCount: int;
     var objectIds: [0..#objectIdCount] EntityId;
 
-    var operands: [0..#entryCount] PredicateEntryOperand;
+    var operands: [0..#entryCount] Operand;
     var entryPos = 0;
 
     proc init() {
-      for op in operands do op.init();
+      for idx in 0..#entryCount {
+        operands[idx] = new PredicateEntryOperand(entries[idx], subjectIdCount, subjectIds, objectIdCount, objectIds);
+        operands[idx].init();
+      }
     }
 
     proc cleanup() {
