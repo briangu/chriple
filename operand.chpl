@@ -30,6 +30,9 @@ module Operand {
   // Operand base class.  Also serves as Null / empty Operand
   // TODO: convert Operands to be proper Chapel iterators so we can iterate through the AST in parallel
   class Operand {
+    inline proc init() {}
+    inline proc cleanup() {}
+
     inline proc hasValue(): bool {
       return false;
     }
@@ -48,10 +51,12 @@ module Operand {
     }
 
     iter evaluate() {
+      init();
       while (hasValue()) {
         yield getValue();
         advance();
       }
+      cleanup();
     }
   }
 
@@ -67,6 +72,16 @@ module Operand {
     var opA: Operand;
     var opB: Operand;
     var curOp: Operand = nextOperand();
+
+    proc init() {
+      opA.init();
+      opB.init();
+    }
+
+    proc cleanup() {
+      opA.cleanup();
+      opB.cleanup();
+    }
 
     proc nextOperand(): Operand {
       var op: Operand = nil;
@@ -118,6 +133,16 @@ module Operand {
     var opA: Operand;
     var opB: Operand;
     var curOp: Operand = nextOperand();
+
+    proc init() {
+      opA.init();
+      opB.init();
+    }
+
+    proc cleanup() {
+      opA.cleanup();
+      opB.cleanup();
+    }
 
     proc nextOperand(): Operand {
       var op: Operand = nil;

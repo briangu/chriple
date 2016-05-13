@@ -19,12 +19,7 @@ proc verifyOperand(sRange, pRange, oRange, op: Operand) {
     }
   }
 
-  while op.hasValue() {
-    var t = op.getValue();
-    writeln(t);
-    op.advance();
-    /*if (verify_print) then writeln(t);*/
-
+  for t in op.evaluate() {
     if (t.subject < sRange.low && t.subject > sRange.high) then halt("t.subject < sRange.low && t.subject > sRange.high");
     if (t.predicate < pRange.low && t.predicate > pRange.high) then halt("t.predicate < pRange.low && t.predicate > pRange.high");
     if (t.object < oRange.low && t.object > oRange.high) then halt("t.object < oRange.low && t.object > oRange.high");
@@ -98,7 +93,7 @@ for p in pRange {
       tarr[idx].subject = s: EntityId;
       tarr[idx].predicate = p: PredicateId;
       tarr[idx].object = o: EntityId;
-      writeln(idx, " ", tarr[idx]);
+      /*writeln(idx, " ", tarr[idx]);*/
       idx += 1;
     }
   }
@@ -118,12 +113,12 @@ w.writeHalt();
 
 
 var soCount = subjectCount * objectCount;
-writeln("soCount ", soCount);
+/*writeln("soCount ", soCount);*/
 var entry = new PredicateEntry(1, soCount);
 for t in 0..#soCount do entry.add(tarr[t]);
 /*entry.optimize();*/
-writeln("soEntries");
-for x in entry.soEntries do writef("%016xu\n", x);
+/*writeln("soEntries");*/
+/*for x in entry.soEntries do writef("%016xu\n", x);*/
 /*writeln("osEntries");
 for x in entry.osEntries do writef("%016xu\n", x);*/
 
@@ -138,5 +133,4 @@ objectIds[1] = 4;
 objectIds[2] = 5;
 
 var peo = new PredicateEntryOperand(entry, subjectIdCount, subjectIds, objectIdCount, objectIds);
-peo.findNextEntry();
 verifyOperand(1..2, 1..1, 3..5, peo);

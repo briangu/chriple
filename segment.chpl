@@ -51,7 +51,7 @@ module Segment {
       /*var (found,idx) = soEntries.find(soEntry);*/
       const found = false;
       if (!found) {
-        info("adding ", triple, " count = ", count, " ", soEntries.size);
+        /*info("adding ", triple, " count = ", count, " ", soEntries.size);*/
         if (count >= soEntries.size) {
           info("increasing size of soEntries to ", count+entriesArrayIncrementCount);
           // TODO: optimize inserts
@@ -86,6 +86,13 @@ module Segment {
     var entryPos = 0;
     var found: bool;
 
+    proc init() {
+      findNextEntry();
+    }
+
+    proc cleanup() {
+    }
+
     proc findNextEntry() {
       found = false;
       while (!found && (entryPos < entry.count)) {
@@ -107,19 +114,19 @@ module Segment {
       }
     }
 
-    inline proc hasValue(): bool {
-      info("PredicateEntryOperand hasValue() ", entry.predicate);
+    proc hasValue(): bool {
+      /*info("PredicateEntryOperand hasValue() ", entry.predicate);*/
       return found;
     }
 
-    inline proc getValue(): OperandValue {
-      info("PredicateEntryOperand getValue() ", entry.predicate);
+    proc getValue(): OperandValue {
+      /*info("PredicateEntryOperand getValue() ", entry.predicate);*/
       if (!hasValue()) then halt("iterated past end of triples ", entry.predicate);
       return toTriple(entry.soEntries[entryPos], entry.predicate);
     }
 
-    inline proc advance() {
-      info("PredicateEntryOperand advance() ", entry.predicate);
+    proc advance() {
+      /*info("PredicateEntryOperand advance() ", entry.predicate);*/
       if (!hasValue()) then halt("iterated past end of triples", entry.predicate);
       entryPos += 1;
       findNextEntry();
@@ -132,23 +139,28 @@ module Segment {
     var subjectIds: [0..#subjectIdCount] EntityId;
     var objectIdCount: int;
     var objectIds: [0..#objectIdCount] EntityId;
-    var entryPos = 0;
-    var found: bool;
-    var operand = new PredicateEntryOperandSO(entry, subjectIdCount, subjectIds, objectIdCount, objectIds);
 
-    proc findNextEntry() {
-      operand.findNextEntry();
+    var operand: Operand;
+
+    proc init() {
+      operand = new PredicateEntryOperandSO(entry, subjectIdCount, subjectIds, objectIdCount, objectIds);
+      operand.init();
     }
 
-    inline proc hasValue(): bool {
+    proc cleanup() {
+      operand.cleanup();
+      delete operand;
+    }
+
+    proc hasValue(): bool {
       return operand.hasValue();
     }
 
-    inline proc getValue(): OperandValue {
+    proc getValue(): OperandValue {
       return operand.getValue();
     }
 
-    inline proc advance() {
+    proc advance() {
       operand.advance();
     }
   }
@@ -163,32 +175,36 @@ module Segment {
     var objectIdCount: int;
     var objectIds: [0..#objectIdCount] EntityId;
 
-    var operand: PredicateEntryOperand = new PredicateEntryOperand(entries[0], subjectIdCount, subjectIds, objectIdCount, objectIds);
-    var entryPos = 1;
+    var operands: [0..#entryCount] PredicateEntryOperand;
+    var entryPos = 0;
+
+    proc init() {
+      for op in operands do op.init();
+    }
+
+    proc cleanup() {
+      for op in operands do op.cleanup();
+      for op in operands do delete op;
+    }
 
     inline proc hasValue(): bool {
-      if operand == nil then return false;
-      var found = operand.hasValue();
+      if entryPos >= entryCount then return false;
+      var found = operands[entryPos].hasValue();
       if (!found) {
-        delete operand;
-        operand = nil;
-        if (entryPos < entryCount) {
-          operand = new PredicateEntryOperand(entries[entryPos], subjectIdCount, subjectIds, objectIdCount, objectIds);
-          entryPos += 1;
-          found = operand.hasValue();
-        }
+        entryPos += 1;
+        found = hasValue();
       }
       return found;
     }
 
     inline proc getValue(): OperandValue {
-      if operand == nil then halt("MultiPredicateEntryOperand::getValue operand == nil");
-      return operand.getValue();
+      if entryPos >= entryCount then halt("MultiPredicateEntryOperand::getValue operand == nil");
+      return operands[entryPos].getValue();
     }
 
     inline proc advance() {
-      if operand == nil then halt("MultiPredicateEntryOperand::advance operand == nil");
-      operand.advance();
+      if entryPos >= entryCount then halt("MultiPredicateEntryOperand::advance operand == nil");
+      operands[entryPos].advance();
     }
   }
 
