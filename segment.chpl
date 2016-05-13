@@ -77,62 +77,23 @@ module Segment {
     }
   }
 
-  class PredicateEntryOperand: Operand {
+  class PredicateEntryOperandSO: Operand {
     var entry: PredicateEntry;
     var subjectIdCount: int;
     var subjectIds: [0..#subjectIdCount] EntityId;
     var objectIdCount: int;
     var objectIds: [0..#objectIdCount] EntityId;
     var entryPos = 0;
-    var needAdvance = true;
-    var lastFound = false;
+    var found: bool;
 
-    // TODO: this code is too naive, even for a naive impl.
-    //        e.g. we should leverage the fact that the entry arrays are sorted
-    //             don't keep searching for subjects which are already found...
-    inline proc hasValue(): bool {
-      if (!needAdvance) {
-        /*info("PredicateEntryOperand hasValue() ", entry.predicate, " ", lastFound);*/
-        return lastFound;
-      }
-
-      /*info("PredicateEntryOperand hasValue() ", entry.predicate);*/
-      // TODO: enable for S, O, SO, and OS scenarios
-      // TODO: this method should be idempotent
-      var found = false;
+    proc findNextEntry() {
+      found = false;
       while (!found && (entryPos < entry.count)) {
-        if (subjectIdCount > 0) {
-          if (objectIdCount > 0) {
-            // TODO: if objectIdCount > subjectIdCount then bias to osEntries
-            var sEntry = (entry.soEntries[entryPos] >> 32):EntityId;
-            for s in subjectIds {
-              if (sEntry == s) {
-                var oEntry = entry.soEntries[entryPos]: EntityId;
-                for o in objectIds {
-                  if (oEntry == o) {
-                    found = true;
-                    break;
-                  }
-                }
-                if (found) then break;
-              }
-            }
-            if (found) then break;
-            entryPos += 1;
-          } else {
-            var sEntry = (entry.soEntries[entryPos] >> 32):EntityId;
-            for s in subjectIds {
-              if (sEntry == s) {
-                found = true;
-                break;
-              }
-            }
-            if (found) then break;
-            entryPos += 1;
-          }
-        } else {
-          if (objectIdCount > 0) {
-            var oEntry = (entry.osEntries[entryPos] >> 32):EntityId;
+        // TODO: if objectIdCount > subjectIdCount then bias to osEntries
+        var sEntry = (entry.soEntries[entryPos] >> 32):EntityId;
+        for s in subjectIds {
+          if (sEntry == s) {
+            var oEntry = entry.soEntries[entryPos]: EntityId;
             for o in objectIds {
               if (oEntry == o) {
                 found = true;
@@ -140,38 +101,55 @@ module Segment {
               }
             }
             if (found) then break;
-            entryPos += 1;
-          } else {
-            // both subjectIds and objectIds are not specified so just scan through all soEntries
-            found = true;
           }
         }
+        if (!found) then entryPos += 1;
       }
-      lastFound = found;
-      needAdvance = false;
-      /*info("PredicateEntryOperand hasValue() out ", entry.predicate, " ", lastFound);*/
+    }
+
+    inline proc hasValue(): bool {
+      info("PredicateEntryOperand hasValue() ", entry.predicate);
       return found;
     }
 
     inline proc getValue(): OperandValue {
-      /*info("PredicateEntryOperand getValue() ", entry.predicate);*/
+      info("PredicateEntryOperand getValue() ", entry.predicate);
       if (!hasValue()) then halt("iterated past end of triples ", entry.predicate);
-      if (subjectIdCount > 0) {
-        return toTriple(entry.soEntries[entryPos], entry.predicate);
-      } else {
-        if (objectIdCount > 0) {
-          return toTripleFromOSEntry(entry.osEntries[entryPos], entry.predicate);
-        } else {
-          return toTriple(entry.soEntries[entryPos], entry.predicate);
-        }
-      }
+      return toTriple(entry.soEntries[entryPos], entry.predicate);
     }
 
     inline proc advance() {
-      /*info("PredicateEntryOperand advance() ", entry.predicate);*/
+      info("PredicateEntryOperand advance() ", entry.predicate);
       if (!hasValue()) then halt("iterated past end of triples", entry.predicate);
       entryPos += 1;
-      needAdvance = true;
+      findNextEntry();
+    }
+  }
+
+  class PredicateEntryOperand: Operand {
+    var entry: PredicateEntry;
+    var subjectIdCount: int;
+    var subjectIds: [0..#subjectIdCount] EntityId;
+    var objectIdCount: int;
+    var objectIds: [0..#objectIdCount] EntityId;
+    var entryPos = 0;
+    var found: bool;
+    var operand = new PredicateEntryOperandSO(entry, subjectIdCount, subjectIds, objectIdCount, objectIds);
+
+    proc findNextEntry() {
+      operand.findNextEntry();
+    }
+
+    inline proc hasValue(): bool {
+      return operand.hasValue();
+    }
+
+    inline proc getValue(): OperandValue {
+      return operand.getValue();
+    }
+
+    inline proc advance() {
+      operand.advance();
     }
   }
 
