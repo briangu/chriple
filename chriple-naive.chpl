@@ -72,7 +72,7 @@ iter localQuery(query: Query) {
   } else {
     lq = query;
   }
-  {
+  local {
     for res in Partitions[here.id].query(lq) {
       yield res;
     }
@@ -93,7 +93,7 @@ iter query(query: Query) {
       var innerResults: [0..lq.partitionLimit-1] QueryResult;
       var innerCount = 0;
 
-      {
+      local {
         for res in localQuery(lq) {
           innerResults[innerCount] = res;
           innerCount += 1;
