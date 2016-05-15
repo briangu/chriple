@@ -85,6 +85,7 @@ iter query(query: Query) {
   var totalCounts = 0;
   var outerResults: [0..(Locales.size * query.partitionLimit)-1] QueryResult;
 
+  // TODO: we should scope locales by which locales are needed by the operand tree
   for loc in Locales {
     on loc {
       // copy query into locale

@@ -22,10 +22,8 @@ module Operand {
   type OperandValue = Triple;
   type OperandSPOMode = uint(8);
 
-  /*const OperandSPOModeTriple = 0: OperandSPOMode;*/
   const OperandSPOModeSubject = 1: OperandSPOMode;
-  const OperandSPOModePredicate = 2: OperandSPOMode;
-  const OperandSPOModeObject = 3: OperandSPOMode;
+  const OperandSPOModeObject = 2: OperandSPOMode;
 
   // Operand base class.  Also serves as Null / empty Operand
   // TODO: convert Operands to be proper Chapel iterators so we can iterate through the AST in parallel
