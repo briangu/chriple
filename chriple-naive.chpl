@@ -72,7 +72,7 @@ iter localQuery(query: Query) {
   } else {
     lq = query;
   }
-  local {
+  {
     for res in Partitions[here.id].query(lq) {
       yield res;
     }
@@ -93,7 +93,7 @@ iter query(query: Query) {
       var innerResults: [0..lq.partitionLimit-1] QueryResult;
       var innerCount = 0;
 
-      local {
+      {
         for res in localQuery(lq) {
           innerResults[innerCount] = res;
           innerCount += 1;
@@ -322,8 +322,8 @@ proc querySyntheticData() {
     w.writeHalt();
 
     writeln("scan all triples of the form (2..3, 2..3, 3..4)");
-    printTriples(q);
-    /*verifyTriples(2..3, 2..3, 3..4, q);*/
+    /*printTriples(q);*/
+    verifyTriples(2..3, 2..3, 3..4, q);
   }
 }
 
@@ -338,20 +338,13 @@ proc testOperand() {
         tarr[idx].subject = s: EntityId;
         tarr[idx].predicate = p: PredicateId;
         tarr[idx].object = o: EntityId;
-        /*writeln(idx, " ", tarr[idx]);*/
         idx += 1;
       }
     }
   }
 
-  /*writeln("soCount ", soCount);*/
   var entry = new PredicateEntry(1, soCount);
   for t in 0..#soCount do entry.add(tarr[t]);
-  /*entry.optimize();*/
-  /*writeln("soEntries");*/
-  /*for x in entry.soEntries do writef("%016xu\n", x);*/
-  /*writeln("osEntries");
-  for x in entry.osEntries do writef("%016xu\n", x);*/
 
   var subjectIdCount: int = 2;
   var subjectIds: [0..#subjectIdCount] EntityId;

@@ -89,13 +89,11 @@ module Segment {
       findNextEntry();
     }
 
-    proc cleanup() {
-    }
-
     proc findNextEntry() {
       found = false;
       while (!found && (entryPos < entry.count)) {
         // TODO: if objectIdCount > subjectIdCount then bias to osEntries
+        // TODO: replace this horribly inefficient code.
         var sEntry = (entry.soEntries[entryPos] >> 32):EntityId;
         for s in subjectIds {
           if (sEntry == s) {
@@ -129,6 +127,108 @@ module Segment {
     }
   }
 
+  class PredicateEntryOperandStarSAndO: Operand {
+    var entry: PredicateEntry;
+    var objectIdCount: int;
+    var objectIds: [0..#objectIdCount] EntityId;
+    var entryPos = 0;
+    var found: bool;
+
+    proc init() {
+      findNextEntry();
+    }
+
+    proc findNextEntry() {
+      found = false;
+      while (!found && (entryPos < entry.count)) {
+        var oEntry = (entry.osEntries[entryPos] >> 32):EntityId;
+        for o in objectIds {
+          if (oEntry == o) {
+            found = true;
+            break;
+          }
+        }
+        if (!found) then entryPos += 1;
+      }
+    }
+
+    proc hasValue(): bool {
+      return found;
+    }
+
+    proc getValue(): OperandValue {
+      assert(hasValue());
+      return toTripleFromOSEntry(entry.osEntries[entryPos], entry.predicate);
+    }
+
+    proc advance() {
+      assert(hasValue());
+      entryPos += 1;
+      findNextEntry();
+    }
+  }
+
+  class PredicateEntryOperandSAndStarO: Operand {
+    var entry: PredicateEntry;
+    var subjectIdCount: int;
+    var subjectIds: [0..#subjectIdCount] EntityId;
+    var entryPos = 0;
+    var found: bool;
+
+    proc init() {
+      findNextEntry();
+    }
+
+    proc findNextEntry() {
+      found = false;
+      while (!found && (entryPos < entry.count)) {
+        // TODO: replace this horribly inefficient code.
+        var sEntry = (entry.soEntries[entryPos] >> 32):EntityId;
+        for s in subjectIds {
+          if (sEntry == s) {
+            found = true;
+            break;
+          }
+        }
+        if (!found) then entryPos += 1;
+      }
+    }
+
+    proc hasValue(): bool {
+      return found;
+    }
+
+    proc getValue(): OperandValue {
+      assert(hasValue());
+      return toTriple(entry.soEntries[entryPos], entry.predicate);
+    }
+
+    proc advance() {
+      assert(hasValue());
+      entryPos += 1;
+      findNextEntry();
+    }
+  }
+
+  class PredicateEntryOperandStarSAndStarO: Operand {
+    var entry: PredicateEntry;
+    var entryPos = 0;
+
+    proc hasValue(): bool {
+      return (entryPos < entry.count);
+    }
+
+    proc getValue(): OperandValue {
+      assert(hasValue());
+      return toTriple(entry.soEntries[entryPos], entry.predicate);
+    }
+
+    proc advance() {
+      assert(hasValue());
+      entryPos += 1;
+    }
+  }
+
   class PredicateEntryOperand: Operand {
     var entry: PredicateEntry;
     var subjectIdCount: int;
@@ -139,25 +239,50 @@ module Segment {
     var operand: Operand;
 
     proc init() {
-      operand = new PredicateEntryOperandSO(entry, subjectIdCount, subjectIds, objectIdCount, objectIds);
+      /*info("PredicateEntryOperand::init");*/
+      if (operand != nil) then return;
+
+      if (subjectIdCount > 0) {
+        if (objectIdCount > 0) {
+          operand = new PredicateEntryOperandSO(entry, subjectIdCount, subjectIds, objectIdCount, objectIds);
+        } else {
+          operand = new PredicateEntryOperandSAndStarO(entry, subjectIdCount, subjectIds);
+        }
+      } else {
+        if (objectIdCount > 0) {
+          operand = new PredicateEntryOperandStarSAndO(entry, objectIdCount, objectIds);
+        } else {
+          operand = new PredicateEntryOperandStarSAndStarO(entry);
+        }
+      }
       operand.init();
     }
 
     proc cleanup() {
+      /*info("PredicateEntryOperand::cleanup");*/
+      if (operand == nil) then return;
+
       operand.cleanup();
       delete operand;
       operand = nil;
     }
 
     proc hasValue(): bool {
+      /*info("PredicateEntryOperand::hasValue");*/
+      assert(operand != nil);
+      /*if (operand == nil) then return false;*/
       return operand.hasValue();
     }
 
     proc getValue(): OperandValue {
+      /*info("PredicateEntryOperand::getValue");*/
+      assert(operand != nil);
       return operand.getValue();
     }
 
     proc advance() {
+      /*info("PredicateEntryOperand::advance");*/
+      assert(operand != nil);
       operand.advance();
     }
   }
@@ -174,6 +299,8 @@ module Segment {
     var entryPos = 0;
 
     proc init() {
+      if operands[0] != nil then return;
+
       for idx in 0..#entryCount {
         operands[idx] = new PredicateEntryOperand(entries[idx], subjectIdCount, subjectIds, objectIdCount, objectIds);
         operands[idx].init();
@@ -181,6 +308,8 @@ module Segment {
     }
 
     proc cleanup() {
+      if operands[0] == nil then return;
+
       for idx in operands.domain {
         operands[idx].cleanup();
         delete operands[idx];
@@ -189,7 +318,9 @@ module Segment {
     }
 
     proc hasValue(): bool {
+      assert(operands[0] != nil);
       if entryPos >= entryCount then return false;
+
       var found = operands[entryPos].hasValue();
       if (!found) {
         entryPos += 1;
@@ -199,12 +330,17 @@ module Segment {
     }
 
     proc getValue(): OperandValue {
+      assert(operands[0] != nil);
+      assert(entryPos < entryCount);
+
       if entryPos >= entryCount then halt("MultiPredicateEntryOperand::getValue operand == nil");
       return operands[entryPos].getValue();
     }
 
     proc advance() {
-      if entryPos >= entryCount then halt("MultiPredicateEntryOperand::advance operand == nil");
+      assert(operands[0] != nil);
+      assert(entryPos < entryCount);
+
       operands[entryPos].advance();
     }
   }
@@ -293,6 +429,7 @@ module Segment {
 
     iter query(query: Query): QueryResult {
       var op = chasmInterpret(this, query.instructionBuffer);
+      /*info("NaiveMemorySegment::query");*/
       if (op != nil) {
         for triple in op.evaluate() {
           yield new QueryResult(triple);
@@ -308,6 +445,7 @@ module Segment {
       var entryOperand: Operand;
 
       if (predicateIds.size == 0) {
+        /*info("operandForScanPredicate: predicateIds.size == 0");*/
         var predicateEntries: [0..#totalPredicateCount] PredicateEntry;
         var idx: int;
         for entry in predicateHashTable {
@@ -320,11 +458,13 @@ module Segment {
           entryOperand = new MultiPredicateEntryOperand(idx, predicateEntries, subjectIds.size, subjectIds, objectIds.size, objectIds);
         }
       } else if (predicateIds.size == 1) {
+        /*info("operandForScanPredicate: predicateIds.size == 1");*/
         var entry = getEntryForPredicateId(predicateIds[0]);
         if (entry != nil) {
           entryOperand = new PredicateEntryOperand(entry, subjectIds.size, subjectIds, objectIds.size, objectIds);
         }
       } else {
+        /*info("operandForScanPredicate: predicateIds.size == ", predicateIds.size);*/
         var predicateEntries: [0..#predicateIds.size] PredicateEntry;
         var idx: int;
         for i in predicateIds {

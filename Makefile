@@ -6,6 +6,9 @@ chriple:
 chriple_dbg:
 	chpl --print-passes -g --savec=code -o bin/chriple chriple-naive.chpl
 
+dbg:
+	chpl --print-passes -g -o bin/chriple chriple-naive.chpl
+
 bin:
 	mkdir -p bin
 

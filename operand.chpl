@@ -1,6 +1,6 @@
 module Operand {
 
-  use Common, PrivateDist;
+  use Common, Logging, PrivateDist;
 
   /**
     Operand value is the value that represents the run-time, internal search results.
@@ -30,27 +30,28 @@ module Operand {
   // Operand base class.  Also serves as Null / empty Operand
   // TODO: convert Operands to be proper Chapel iterators so we can iterate through the AST in parallel
   class Operand {
-    inline proc init() {}
-    inline proc cleanup() {}
+    proc init() {}
+    proc cleanup() {}
 
     inline proc hasValue(): bool {
       return false;
     }
 
-    inline proc getValue(): OperandValue {
+    proc getValue(): OperandValue {
       if (!hasValue()) {
         halt("iterated too far");
       }
       return new Triple(0,0,0);
     }
 
-    inline proc advance() {
+    proc advance() {
       if (!hasValue()) {
         halt("iterated too far");
       }
     }
 
     iter evaluate() {
+      /*info("evaluate ");*/
       init();
       while (hasValue()) {
         yield getValue();
@@ -71,16 +72,26 @@ module Operand {
     var mode: OperandSPOMode;
     var opA: Operand;
     var opB: Operand;
-    var curOp: Operand = nextOperand();
+    var curOp: Operand;
 
     proc init() {
+      /*info("UnionOperand::init");*/
+      if (opA != nil) then return;
+
       opA.init();
       opB.init();
+      curOp = nextOperand();
     }
 
     proc cleanup() {
+      /*info("UnionOperand::cleanup");*/
+      if (opA == nil) then return;
+
       opA.cleanup();
+      opA = nil;
       opB.cleanup();
+      opB = nil;
+      curOp = nil;
     }
 
     proc nextOperand(): Operand {
@@ -107,21 +118,20 @@ module Operand {
     }
 
     inline proc hasValue(): bool {
+      assert(opA != nil);
       return curOp != nil;
     }
 
     inline proc getValue(): OperandValue {
-      if (!hasValue()) {
-        halt("union iterated past end of operands ", opA, opB);
-      }
+      assert(opA != nil);
+      assert(hasValue());
 
       return curOp.getValue();
     }
 
     proc advance() {
-      if (!hasValue()) {
-        halt("union iterated past end of operands ", opA, opB);
-      }
+      assert(opA != nil);
+      assert(hasValue());
 
       curOp.advance();
       curOp = nextOperand();
@@ -132,19 +142,28 @@ module Operand {
     var mode: OperandSPOMode;
     var opA: Operand;
     var opB: Operand;
-    var curOp: Operand = nextOperand();
+    var curOp: Operand;
 
     proc init() {
+      /*info("IntersectionOperand::init");*/
+      if (opA != nil) then return;
       opA.init();
       opB.init();
+      curOp = nextOperand();
     }
 
     proc cleanup() {
+      /*info("IntersectionOperand::cleanup");*/
+      if (opA == nil) then return;
       opA.cleanup();
+      opA = nil;
       opB.cleanup();
+      opB = nil;
+      curOp = nil;
     }
 
     proc nextOperand(): Operand {
+      /*info("IntersectionOperand::nextOperand");*/
       var op: Operand = nil;
 
       while(opA.hasValue() && opB.hasValue()) {
@@ -175,21 +194,21 @@ module Operand {
     }
 
     inline proc hasValue(): bool {
+      assert(opA != nil);
+
       return curOp != nil;
     }
 
     inline proc getValue(): OperandValue {
-      if (!hasValue()) {
-        halt("intersection iterated past end of operands ", opA, opB);
-      }
+      assert(opA != nil);
+      assert(hasValue());
 
       return curOp.getValue();
     }
 
     inline proc advance() {
-      if (!hasValue()) {
-        halt("intersection iterated past end of operands ", opA, opB);
-      }
+      assert(opA != nil);
+      assert(hasValue());
 
       curOp = nextOperand();
     }
