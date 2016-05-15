@@ -306,7 +306,7 @@ proc querySyntheticData() {
     w.writeObjectId(3);
 
     // B = ([2,3],3,4)
-    w.writeScanPredicate();
+    /*w.writeScanPredicate();
     w.writeCount(2);
     w.writeSubjectId(2);
     w.writeSubjectId(3);
@@ -317,13 +317,13 @@ proc querySyntheticData() {
 
     // A.object AND B.object
     w.writeAnd();
-    w.writeSPOMode(OperandSPOModeSubject);
+    w.writeSPOMode(OperandSPOModeSubject);*/
 
     w.writeHalt();
 
     writeln("scan all triples of the form (2..3, 2..3, 3..4)");
-    /*printTriples(q);*/
-    verifyTriples(2..3, 2..3, 3..4, q);
+    printTriples(q);
+    /*verifyTriples(2..3, 2..3, 3..4, q);*/
   }
 }
 
