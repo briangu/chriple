@@ -23,7 +23,6 @@ module Segment {
 
     iter query(query: Query): QueryResult {
       halt("not implemented");
-      /*yield new QueryResult();*/
       yield new QueryResult();
     }
 
@@ -34,7 +33,7 @@ module Segment {
 
     proc optimize() {}
 
-    iter dump(): Triple { halt(); yield nil; }
+    iter dump(): Triple { halt(); yield new Triple(0,0,0); }
   }
 
   class PredicateEntry {
@@ -115,19 +114,16 @@ module Segment {
     }
 
     proc hasValue(): bool {
-      /*info("PredicateEntryOperand hasValue() ", entry.predicate);*/
       return found;
     }
 
     proc getValue(): OperandValue {
-      /*info("PredicateEntryOperand getValue() ", entry.predicate);*/
-      if (!hasValue()) then halt("iterated past end of triples ", entry.predicate);
+      assert(hasValue());
       return toTriple(entry.soEntries[entryPos], entry.predicate);
     }
 
     proc advance() {
-      /*info("PredicateEntryOperand advance() ", entry.predicate);*/
-      if (!hasValue()) then halt("iterated past end of triples", entry.predicate);
+      assert(hasValue());
       entryPos += 1;
       findNextEntry();
     }
@@ -150,6 +146,7 @@ module Segment {
     proc cleanup() {
       operand.cleanup();
       delete operand;
+      operand = nil;
     }
 
     proc hasValue(): bool {
@@ -184,11 +181,14 @@ module Segment {
     }
 
     proc cleanup() {
-      for op in operands do op.cleanup();
-      for op in operands do delete op;
+      for idx in operands.domain {
+        operands[idx].cleanup();
+        delete operands[idx];
+        operands[idx] = nil;
+      }
     }
 
-    inline proc hasValue(): bool {
+    proc hasValue(): bool {
       if entryPos >= entryCount then return false;
       var found = operands[entryPos].hasValue();
       if (!found) {
@@ -198,12 +198,12 @@ module Segment {
       return found;
     }
 
-    inline proc getValue(): OperandValue {
+    proc getValue(): OperandValue {
       if entryPos >= entryCount then halt("MultiPredicateEntryOperand::getValue operand == nil");
       return operands[entryPos].getValue();
     }
 
-    inline proc advance() {
+    proc advance() {
       if entryPos >= entryCount then halt("MultiPredicateEntryOperand::advance operand == nil");
       operands[entryPos].advance();
     }
@@ -300,45 +300,46 @@ module Segment {
       }
     }
 
+    proc populateAllPredicateEntries(ref allPredicateEntries: [0..#totalPredicateCount] PredicateEntry) {
+      return allPredicateEntries;
+    }
+
     proc operandForScanPredicate(subjectIds: [?S] EntityId, predicateIds: [?P] PredicateId, objectIds: [?O] EntityId): Operand {
-      if predicateIds.size == 0 {
-        var allPredicateEntries: [0..#totalPredicateCount] PredicateEntry;
+      var entryOperand: Operand;
+
+      if (predicateIds.size == 0) {
+        var predicateEntries: [0..#totalPredicateCount] PredicateEntry;
         var idx: int;
-        for i in predicateHashTable.domain {
-          var entry = predicateHashTable[i];
+        for entry in predicateHashTable {
           if entry != nil {
-            allPredicateEntries[idx] = entry;
+            predicateEntries[idx] = entry;
             idx += 1;
           }
         }
         if (idx > 0) {
-          return new MultiPredicateEntryOperand(idx, allPredicateEntries, subjectIds.size, subjectIds, objectIds.size, objectIds);
-        } else {
-          return NullOperand[here.id];
+          entryOperand = new MultiPredicateEntryOperand(idx, predicateEntries, subjectIds.size, subjectIds, objectIds.size, objectIds);
         }
       } else if (predicateIds.size == 1) {
         var entry = getEntryForPredicateId(predicateIds[0]);
         if (entry != nil) {
-          return new PredicateEntryOperand(entry, subjectIds.size, subjectIds, objectIds.size, objectIds);
-        } else {
-          return NullOperand[here.id];
+          entryOperand = new PredicateEntryOperand(entry, subjectIds.size, subjectIds, objectIds.size, objectIds);
         }
       } else {
-        var allPredicateEntries: [0..#totalPredicateCount] PredicateEntry;
+        var predicateEntries: [0..#predicateIds.size] PredicateEntry;
         var idx: int;
         for i in predicateIds {
           var entry = predicateHashTable[i];
           if entry != nil {
-            allPredicateEntries[idx] = entry;
+            predicateEntries[idx] = entry;
             idx += 1;
           }
         }
         if (idx > 0) {
-          return new MultiPredicateEntryOperand(idx, allPredicateEntries, subjectIds.size, subjectIds, objectIds.size, objectIds);
-        } else {
-          return NullOperand[here.id];
+          entryOperand = new MultiPredicateEntryOperand(idx, predicateEntries, subjectIds.size, subjectIds, objectIds.size, objectIds);
         }
       }
+
+      return if entryOperand != nil then entryOperand else NullOperand[here.id];
     }
 
     proc optimize() {

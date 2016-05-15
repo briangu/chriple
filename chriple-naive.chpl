@@ -10,9 +10,13 @@ use Chasm, Common, GenHashKey32, Logging, Operand, Partition, PrivateDist, Query
 config const subjectCount = 16;
 config const predicateCount = 8;
 config const objectCount = 16;
-config const verify_print = false;
-
 const totalTripleCount = subjectCount * predicateCount * objectCount;
+const sRange = 0..#subjectCount;
+const pRange = 0..#predicateCount;
+const oRange = 0..#objectCount;
+var soCount = subjectCount * objectCount;
+
+config const verify_print = false;
 
 proc initPartitions() {
   var t: Timer;
@@ -49,7 +53,7 @@ proc addSyntheticData() {
     writeln("adding predicate: ", p);
     var partitionId = partitionIdForPredicate(p:PredicateId);
     on Locales[partitionId] {
-      var triples: [0..#(subjectCount * objectCount)] Triple;
+      var triples: [0..#soCount] Triple;
       for s in 0..#subjectCount {
         for o in 0..#objectCount {
           triples[s*objectCount + o] = new Triple(s:EntityId, p:PredicateId, o:EntityId);
@@ -131,6 +135,41 @@ proc verifyTriples(sRange, pRange, oRange, q: Query) {
     var t = result.triple;
     if (verify_print) then writeln(t);
 
+    if (t.subject < sRange.low && t.subject > sRange.high) then halt("t.subject < sRange.low && t.subject > sRange.high");
+    if (t.predicate < pRange.low && t.predicate > pRange.high) then halt("t.predicate < pRange.low && t.predicate > pRange.high");
+    if (t.object < oRange.low && t.object > oRange.high) then halt("t.object < oRange.low && t.object > oRange.high");
+
+    if (!tuples[t.subject, t.predicate, t.object]) then halt("tuple not found: ", t);
+
+    // mark the tuple as touched
+    tuples[t.subject, t.predicate, t.object] = false;
+  }
+
+  var failed = false;
+  for s in sRange {
+    for p in pRange {
+      for o in oRange {
+        if (tuples[s,p,o]) {
+          writeln(" (", s, " ", p, " ", o, ") was not verified.");
+          failed = true;
+        }
+      }
+    }
+  }
+  if (failed) then halt("found tuples which were not verified.");
+}
+
+proc verifyOperand(sRange, pRange, oRange, op: Operand) {
+  var tuples: [sRange, pRange, oRange] bool;
+  for s in sRange {
+    for p in pRange {
+      for o in oRange {
+        tuples[s,p,o] = true;
+      }
+    }
+  }
+
+  for t in op.evaluate() {
     if (t.subject < sRange.low && t.subject > sRange.high) then halt("t.subject < sRange.low && t.subject > sRange.high");
     if (t.predicate < pRange.low && t.predicate > pRange.high) then halt("t.predicate < pRange.low && t.predicate > pRange.high");
     if (t.object < oRange.low && t.object > oRange.high) then halt("t.object < oRange.low && t.object > oRange.high");
@@ -288,15 +327,108 @@ proc querySyntheticData() {
   }
 }
 
+proc testOperand() {
+  var t = new Triple(1,2,3);
+
+  var tarr: [0..#totalTripleCount] Triple;
+  var idx = 0;
+  for p in pRange {
+    for s in sRange {
+      for o in oRange {
+        tarr[idx].subject = s: EntityId;
+        tarr[idx].predicate = p: PredicateId;
+        tarr[idx].object = o: EntityId;
+        /*writeln(idx, " ", tarr[idx]);*/
+        idx += 1;
+      }
+    }
+  }
+
+  /*writeln("soCount ", soCount);*/
+  var entry = new PredicateEntry(1, soCount);
+  for t in 0..#soCount do entry.add(tarr[t]);
+  /*entry.optimize();*/
+  /*writeln("soEntries");*/
+  /*for x in entry.soEntries do writef("%016xu\n", x);*/
+  /*writeln("osEntries");
+  for x in entry.osEntries do writef("%016xu\n", x);*/
+
+  var subjectIdCount: int = 2;
+  var subjectIds: [0..#subjectIdCount] EntityId;
+  subjectIds[0] = 1;
+  subjectIds[1] = 2;
+  var objectIdCount: int = 3;
+  var objectIds: [0..#objectIdCount] EntityId;
+  objectIds[0] = 3;
+  objectIds[1] = 4;
+  objectIds[2] = 5;
+
+  var peo = new PredicateEntryOperand(entry, subjectIdCount, subjectIds, objectIdCount, objectIds);
+  verifyOperand(1..2, 1..1, 3..5, peo);
+}
+
+proc testPredicateEntry() {
+  var t = new Triple(1,2,3);
+
+  var tarr: [0..#totalTripleCount] Triple;
+  var idx = 0;
+  for p in pRange {
+    for s in sRange {
+      for o in oRange {
+        tarr[idx].subject = s: EntityId;
+        tarr[idx].predicate = p: PredicateId;
+        tarr[idx].object = o: EntityId;
+        idx += 1;
+      }
+    }
+  }
+
+  var entry = new PredicateEntry(1, soCount);
+  for t in 0..#soCount do entry.add(tarr[t]);
+  entry.optimize();
+  /*for x in entry.soEntries do writef("%016xu\n", x);*/
+  /*for x in entry.osEntries do writef("%016xu\n", x);*/
+  var sidx = 0;
+  var oidx = 0;
+  for x in entry.soEntries {
+    var expected = (sidx << 32 | oidx);
+    /*writef("%016xu %016xu\n", x, expected);*/
+    assert(x == expected);
+    oidx += 1;
+    if (oidx % objectCount == 0) {
+      sidx += 1;
+      oidx = 0;
+    }
+  }
+  sidx = 0;
+  oidx = 0;
+  for x in entry.osEntries {
+    var expected = (oidx << 32 | sidx);
+    /*writef("%016xu %016xu\n", x, expected);*/
+    assert(x == expected);
+    sidx += 1;
+    if (sidx % subjectCount == 0) {
+      sidx = 0;
+      oidx += 1;
+    }
+  }
+}
+
 proc dump() {
   for loc in Locales do on loc do for triple in Partitions[here.id].dump() do writeln(triple);
 }
 
 proc main() {
-  writeln("starting tests");
+  writeln("testTriple:");
   testTriple();
-  writeln("ending tests");
 
+  writeln("testOperand:");
+  testOperand();
+
+  writeln("testPredicateEntry");
+  testPredicateEntry();
+
+  writeln("test queries");
   initPartitions();
   addSyntheticData();
   querySyntheticData();
