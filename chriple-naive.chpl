@@ -348,7 +348,7 @@ proc querySyntheticData() {
 
     w.writeHalt();
 
-    writeln("union triples of the form (1..4, 2..2, 3..4)");
+    writeln("union triple subjects of the form (1..4, 2..2, 3..4)");
     var triples = createTripleVerificationArray(1..4, 2..2, 3..4);
     triples[1,2,4] = false;
     triples[4,2,4] = false;
@@ -401,8 +401,58 @@ proc querySyntheticData() {
 
     w.writeHalt();
 
-    writeln("intersect triples of the form (2..3, 2..2, 3..4)");
+    writeln("intersect triple subjects of the form (2..3, 2..2, 3..4)");
     verifyTriples(2..3, 2..2, 3..4, q);
+  }
+  {
+    q.instructionBuffer.clear();
+    var w = new InstructionWriter(q.instructionBuffer);
+    // A = (1,2,1..4)
+    /*
+    (subject = 1, predicate = 2, object = 1)
+    (subject = 1, predicate = 2, object = 2)
+    (subject = 1, predicate = 2, object = 3)
+    (subject = 1, predicate = 2, object = 4)
+    */
+    w.writeScanPredicate();
+    w.writeCount(1);
+    w.writeSubjectId(1);
+    w.writeCount(1);
+    w.writePredicateId(2);
+    w.writeCount(4);
+    w.writeObjectId(1);
+    w.writeObjectId(2);
+    w.writeObjectId(3);
+    w.writeObjectId(4);
+
+    // B = (2,3,[2,3])
+    /*
+    (subject = 2, predicate = 2, object = 2)
+    (subject = 2, predicate = 2, object = 3)
+    */
+    w.writeScanPredicate();
+    w.writeCount(1);
+    w.writeObjectId(2);
+    w.writeCount(1);
+    w.writePredicateId(2);
+    w.writeCount(2);
+    w.writeSubjectId(2);
+    w.writeSubjectId(3);
+
+    // A.object AND B.object
+    /*
+    (subject = 2, predicate = 2, object = 2)
+    (subject = 1, predicate = 2, object = 2)
+    (subject = 2, predicate = 2, object = 3)
+    (subject = 1, predicate = 2, object = 3)
+    */
+    w.writeAnd();
+    w.writeSPOMode(OperandSPOModeObject);
+
+    w.writeHalt();
+
+    writeln("intersect triple objects of the form (1..2, 2..2, 2..3)");
+    verifyTriples(1..2, 2..2, 2..3, q);
   }
 }
 
