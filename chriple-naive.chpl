@@ -294,6 +294,12 @@ proc querySyntheticData() {
     q.instructionBuffer.clear();
     var w = new InstructionWriter(q.instructionBuffer);
     // A = (*,2,3)
+    /*
+    (subject = 1, predicate = 2, object = 3)
+    (subject = 2, predicate = 2, object = 3)
+    (subject = 3, predicate = 2, object = 3)
+    (subject = 4, predicate = 2, object = 3)
+    */
     w.writeScanPredicate();
     w.writeCount(4);
     w.writeSubjectId(1);
@@ -306,7 +312,63 @@ proc querySyntheticData() {
     w.writeObjectId(3);
 
     // B = ([2,3],3,4)
-    /*w.writeScanPredicate();
+    /*
+    (subject = 2, predicate = 2, object = 4)
+    (subject = 3, predicate = 2, object = 4)
+    */
+    w.writeScanPredicate();
+    w.writeCount(2);
+    w.writeSubjectId(2);
+    w.writeSubjectId(3);
+    w.writeCount(1);
+    w.writePredicateId(2);
+    w.writeCount(1);
+    w.writeSubjectId(4);
+
+    // A.object OR B.object
+    /*
+    (subject = 2, predicate = 2, object = 4)
+    (subject = 3, predicate = 2, object = 4)
+    (subject = 1, predicate = 2, object = 3)
+    (subject = 2, predicate = 2, object = 3)
+    (subject = 3, predicate = 2, object = 3)
+    (subject = 4, predicate = 2, object = 3)
+    */
+    w.writeOr();
+    w.writeSPOMode(OperandSPOModeSubject);
+
+    w.writeHalt();
+
+    writeln("union triples of the form (1..4, 2..2, 3..4)");
+    verifyTriples(1..4, 2..2, 3..4, q);
+  }
+  {
+    q.instructionBuffer.clear();
+    var w = new InstructionWriter(q.instructionBuffer);
+    // A = (*,2,3)
+    /*
+    (subject = 1, predicate = 2, object = 3)
+    (subject = 2, predicate = 2, object = 3)
+    (subject = 3, predicate = 2, object = 3)
+    (subject = 4, predicate = 2, object = 3)
+    */
+    w.writeScanPredicate();
+    w.writeCount(4);
+    w.writeSubjectId(1);
+    w.writeSubjectId(2);
+    w.writeSubjectId(3);
+    w.writeSubjectId(4);
+    w.writeCount(1);
+    w.writePredicateId(2);
+    w.writeCount(1);
+    w.writeObjectId(3);
+
+    // B = ([2,3],3,4)
+    /*
+    (subject = 2, predicate = 2, object = 4)
+    (subject = 3, predicate = 2, object = 4)
+    */
+    w.writeScanPredicate();
     w.writeCount(2);
     w.writeSubjectId(2);
     w.writeSubjectId(3);
@@ -316,14 +378,19 @@ proc querySyntheticData() {
     w.writeSubjectId(4);
 
     // A.object AND B.object
+    /*
+    (subject = 2, predicate = 2, object = 4)
+    (subject = 2, predicate = 2, object = 3)
+    (subject = 3, predicate = 2, object = 4)
+    (subject = 3, predicate = 2, object = 3)
+    */
     w.writeAnd();
-    w.writeSPOMode(OperandSPOModeSubject);*/
+    w.writeSPOMode(OperandSPOModeSubject);
 
     w.writeHalt();
 
-    writeln("scan all triples of the form (2..3, 2..3, 3..4)");
-    printTriples(q);
-    /*verifyTriples(2..3, 2..3, 3..4, q);*/
+    writeln("intersect triples of the form (2..3, 2..2, 3..4)");
+    verifyTriples(2..3, 2..2, 3..4, q);
   }
 }
 

@@ -170,28 +170,33 @@ module Operand {
     proc nextOperand(): Operand {
       /*info("IntersectionOperand::nextOperand");*/
       var op: Operand = nil;
+      var firstAdvance = true;
 
       while(opA.hasValue() && opB.hasValue()) {
         var docIndexA = tripleComponentFromOperand(mode, opA);
         var docIndexB = tripleComponentFromOperand(mode, opB);
 
+        /*info(docIndexA, " ", docIndexB, " ", if curOp != nil then tripleComponentFromOperand(mode, curOp) else 0);*/
+
         if (docIndexA > docIndexB) {
-          opA.advance();
+          /*info("docIndexA > docIndexB");*/
+          opB.advance();
+          firstAdvance = false;
         } else if (docIndexA == docIndexB) {
-          if ((curOp != nil) && (tripleComponentFromOperand(mode, curOp) == docIndexA)) {
-            if (curOp == opA) {
-              opA.advance();
-              op = opB;
-            } else {
-              opB.advance();
-              op = opA;
-            }
+          /*info("docIndexA == docIndexB");*/
+          if (curOp != nil) {
+            /*info("(curOp != nil) ", curOp == opA);*/
+            if (firstAdvance) then curOp.advance();
+            op = if curOp == opA then opB else opA;
           } else {
+            /*info("op = opA");*/
             op = opA;
           }
           break;
         } else { // A < B
+          /*info("opB.advance");*/
           opB.advance();
+          firstAdvance = false;
         }
       }
 
@@ -207,10 +212,12 @@ module Operand {
     inline proc getValue(): OperandValue {
       assert(hasValue());
 
+      /*info(curOp == opA, " ", curOp.getValue());*/
       return curOp.getValue();
     }
 
     inline proc advance() {
+      /*info("IntersectionOperand::advance");*/
       assert(hasValue());
 
       curOp = nextOperand();
