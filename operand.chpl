@@ -22,7 +22,7 @@ module Operand {
   type OperandValue = Triple;
   type OperandSPOMode = uint(8);
 
-  const OperandSPOModeTriple = 0: OperandSPOMode;
+  /*const OperandSPOModeTriple = 0: OperandSPOMode;*/
   const OperandSPOModeSubject = 1: OperandSPOMode;
   const OperandSPOModePredicate = 2: OperandSPOMode;
   const OperandSPOModeObject = 3: OperandSPOMode;
@@ -76,11 +76,12 @@ module Operand {
 
     proc init() {
       /*info("UnionOperand::init");*/
-      if (opA != nil) then return;
+      if (curOp != nil) then return;
 
       opA.init();
       opB.init();
       curOp = nextOperand();
+      /*info("UnionOperand:curOp ", curOp);*/
     }
 
     proc cleanup() {
@@ -95,6 +96,7 @@ module Operand {
     }
 
     proc nextOperand(): Operand {
+      /*info("UnionOperand::nextOperand");*/
       var op: Operand = nil;
 
       if (opA.hasValue() && opB.hasValue()) {
@@ -114,23 +116,24 @@ module Operand {
         op = opB;
       }
 
+      /*info("UnionOperand::nextOperand ", op == nil);*/
+
       return op;
     }
 
     inline proc hasValue(): bool {
+      /*info("UnionOperand::hasValue ", curOp == nil);*/
       assert(opA != nil);
       return curOp != nil;
     }
 
     inline proc getValue(): OperandValue {
-      assert(opA != nil);
       assert(hasValue());
 
       return curOp.getValue();
     }
 
     proc advance() {
-      assert(opA != nil);
       assert(hasValue());
 
       curOp.advance();
@@ -146,7 +149,8 @@ module Operand {
 
     proc init() {
       /*info("IntersectionOperand::init");*/
-      if (opA != nil) then return;
+      if (curOp != nil) then return;
+
       opA.init();
       opB.init();
       curOp = nextOperand();
@@ -155,6 +159,7 @@ module Operand {
     proc cleanup() {
       /*info("IntersectionOperand::cleanup");*/
       if (opA == nil) then return;
+
       opA.cleanup();
       opA = nil;
       opB.cleanup();
@@ -200,14 +205,12 @@ module Operand {
     }
 
     inline proc getValue(): OperandValue {
-      assert(opA != nil);
       assert(hasValue());
 
       return curOp.getValue();
     }
 
     inline proc advance() {
-      assert(opA != nil);
       assert(hasValue());
 
       curOp = nextOperand();

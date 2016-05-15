@@ -327,7 +327,7 @@ proc querySyntheticData() {
   }
 }
 
-proc testOperand() {
+proc testPredicateEntryOperand() {
   var t = new Triple(1,2,3);
 
   var tarr: [0..#totalTripleCount] Triple;
@@ -407,6 +407,118 @@ proc testPredicateEntry() {
   }
 }
 
+proc testChasm() {
+  /*var expectedTriple = 10: Triple;
+
+  var buffer = new InstructionBuffer(1024);
+
+  var writer = new InstructionWriter(buffer);
+  writer.write_push();
+  writer.write_(expectedTerm);
+
+  buffer.rewind();
+  var reader = new InstructionReader(buffer);
+  var op: ChasmOp;
+  var term: Term;
+  op = reader.read();
+  if (op != CHASM_PUSH) then halt("opcode should have been CHASM_PUSH: ", " got ", op, " ", reader);
+  term = reader.readTerm();
+  if (term != expectedTerm) then halt("term should have been ", expectedTerm, " got ", term, " ", reader);
+
+  delete buffer;*/
+}
+
+class FixedDataOperand : Operand {
+  var count: uint;
+  var data: [0..count-1] OperandValue;
+  var offset: uint = 0;
+
+  proc hasValue(): bool {
+    return offset <= data.domain.high;
+  }
+
+  proc getValue(): OperandValue {
+    if (!hasValue()) {
+      halt("iterated too far");
+    }
+    return data[offset];
+  }
+
+  proc advance() {
+    if (!hasValue()) {
+      halt("iterated too far");
+    }
+    offset += 1;
+  }
+}
+
+proc testOperands() {
+  {
+    writeln("start validating FixedDataOperand");
+    var fixed = new FixedDataOperand(1);
+    fixed.data[0] = new Triple(1,2,3);
+    var count = 0;
+    for result in fixed.evaluate() {
+      if (result != fixed.data[0]) {
+        halt("result not expected: ", result);
+      }
+      count += 1;
+    }
+    if (count != 1) {
+      halt("count != 1 got ", count, fixed);
+    }
+    delete fixed;
+    writeln("stop validating FixedDataOperand");
+  }
+
+  {
+    writeln("start validating UnionOperand");
+    var fixedA = new FixedDataOperand(1);
+    fixedA.data[0] = new Triple(1,2,3);
+
+    var fixedB = new FixedDataOperand(1);
+    fixedB.data[0] = new Triple(2,3,4);
+
+    var op = new UnionOperand(OperandSPOModeSubject, fixedA, fixedB);
+    var count = 0;
+    for result in op.evaluate() {
+      if (result != fixedA.data[0] && result != fixedB.data[0]) {
+        halt("result not expected: ", result);
+      }
+      count += 1;
+    }
+    if (count != 2) {
+      halt("count != 2 got ", count, fixedA, fixedB);
+    }
+    delete op;
+    writeln("stop validating UnionOperand");
+  }
+
+  {
+    writeln("start validating IntersectionOperand");
+    var fixedA = new FixedDataOperand(1);
+    fixedA.data[0] = new Triple(1,2,3);
+
+    var fixedB = new FixedDataOperand(2);
+    fixedB.data[0] = new Triple(1,3,4);
+    fixedB.data[1] = new Triple(4,5,6);
+
+    var op = new IntersectionOperand(OperandSPOModeSubject, fixedA, fixedB);
+    var count = 0;
+    for result in op.evaluate() {
+      if (result.subject != fixedA.data[0].subject && result.subject != fixedB.data[1].subject) {
+        halt("result not expected: ", result.subject);
+      }
+      count += 1;
+    }
+    if (count != 2) {
+      halt("count != 2 got ", count, fixedA, fixedB);
+    }
+    delete op;
+    writeln("stop validating UnionOperand");
+  }
+}
+
 proc dump() {
   for loc in Locales do on loc do for triple in Partitions[here.id].dump() do writeln(triple);
 }
@@ -415,8 +527,12 @@ proc main() {
   writeln("testTriple:");
   testTriple();
 
+  writeln("testChasm");
+  testChasm();
+  testOperands();
+
   writeln("testOperand:");
-  testOperand();
+  PredicateEntryOperand();
 
   writeln("testPredicateEntry");
   testPredicateEntry();
