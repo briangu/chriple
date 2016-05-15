@@ -121,15 +121,27 @@ proc printTriples(q: Query) {
   }
 }
 
-proc verifyTriples(sRange, pRange, oRange, q: Query) {
-  var tuples: [sRange, pRange, oRange] bool;
+proc createTripleVerificationArray(sRange, pRange, oRange) {
+  var triples: [sRange, pRange, oRange] bool;
   for s in sRange {
     for p in pRange {
       for o in oRange {
-        tuples[s,p,o] = true;
+        triples[s,p,o] = true;
       }
     }
   }
+  return triples;
+}
+
+proc verifyTriples(sRange, pRange, oRange, q: Query) {
+  verifyTriplesWithArray(createTripleVerificationArray(sRange, pRange, oRange), q);
+}
+
+proc verifyTriplesWithArray(ref triples, q: Query) {
+
+  const sRange = triples.domain.dim(1);
+  const pRange = triples.domain.dim(2);
+  const oRange = triples.domain.dim(3);
 
   for result in query(q) {
     var t = result.triple;
@@ -139,32 +151,29 @@ proc verifyTriples(sRange, pRange, oRange, q: Query) {
     if (t.predicate < pRange.low && t.predicate > pRange.high) then halt("t.predicate < pRange.low && t.predicate > pRange.high");
     if (t.object < oRange.low && t.object > oRange.high) then halt("t.object < oRange.low && t.object > oRange.high");
 
-    if (!tuples[t.subject, t.predicate, t.object]) then halt("tuple not found: ", t);
+    if (!triples[t.subject, t.predicate, t.object]) then halt("tuple not found: ", t);
 
     // mark the tuple as touched
-    tuples[t.subject, t.predicate, t.object] = false;
+    triples[t.subject, t.predicate, t.object] = false;
   }
 
   var failed = false;
-  for s in sRange {
-    for p in pRange {
-      for o in oRange {
-        if (tuples[s,p,o]) {
-          writeln(" (", s, " ", p, " ", o, ") was not verified.");
-          failed = true;
-        }
-      }
+  for (s,p,o) in triples.domain {
+    var t = triples[s,p,o];
+    if (t) {
+      writeln(" (", s, " ", p, " ", o, ") was not verified.");
+      failed = true;
     }
   }
-  if (failed) then halt("found tuples which were not verified.");
+  if (failed) then halt("found triples which were not verified.");
 }
 
 proc verifyOperand(sRange, pRange, oRange, op: Operand) {
-  var tuples: [sRange, pRange, oRange] bool;
+  var triples: [sRange, pRange, oRange] bool;
   for s in sRange {
     for p in pRange {
       for o in oRange {
-        tuples[s,p,o] = true;
+        triples[s,p,o] = true;
       }
     }
   }
@@ -174,24 +183,24 @@ proc verifyOperand(sRange, pRange, oRange, op: Operand) {
     if (t.predicate < pRange.low && t.predicate > pRange.high) then halt("t.predicate < pRange.low && t.predicate > pRange.high");
     if (t.object < oRange.low && t.object > oRange.high) then halt("t.object < oRange.low && t.object > oRange.high");
 
-    if (!tuples[t.subject, t.predicate, t.object]) then halt("tuple not found: ", t);
+    if (!triples[t.subject, t.predicate, t.object]) then halt("tuple not found: ", t);
 
     // mark the tuple as touched
-    tuples[t.subject, t.predicate, t.object] = false;
+    triples[t.subject, t.predicate, t.object] = false;
   }
 
   var failed = false;
   for s in sRange {
     for p in pRange {
       for o in oRange {
-        if (tuples[s,p,o]) {
+        if (triples[s,p,o]) {
           writeln(" (", s, " ", p, " ", o, ") was not verified.");
           failed = true;
         }
       }
     }
   }
-  if (failed) then halt("found tuples which were not verified.");
+  if (failed) then halt("found triples which were not verified.");
 }
 
 proc querySyntheticData() {
@@ -340,7 +349,10 @@ proc querySyntheticData() {
     w.writeHalt();
 
     writeln("union triples of the form (1..4, 2..2, 3..4)");
-    verifyTriples(1..4, 2..2, 3..4, q);
+    var triples = createTripleVerificationArray(1..4, 2..2, 3..4);
+    triples[1,2,4] = false;
+    triples[4,2,4] = false;
+    verifyTriplesWithArray(triples, q);
   }
   {
     q.instructionBuffer.clear();
