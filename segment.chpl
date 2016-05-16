@@ -1,9 +1,29 @@
 module Segment {
 
-  use Common, GenHashKey32, Logging, ObjectPool, Operand, Sort, Query;
+  use Common, GenHashKey32, Logging, ObjectPool, Operand, PrivateDist, Sort, Time, Query;
 
   // Globally reusable Null / empty singleton operand
   var NullOperand: [PrivateSpace] Operand;
+  var Partitions: [PrivateSpace] Segment;
+
+  proc initPartitions() {
+    var t: Timer;
+    t.start();
+
+    forall p in Partitions do p = new NaiveMemorySegment();
+    forall n in NullOperand do n = new Operand();
+
+    t.stop();
+    timing("initialized partitions in ",t.elapsed(TimeUnits.microseconds), " microseconds");
+  }
+
+  inline proc partitionIdForTriple(triple: Triple): int {
+    return partitionIdForPredicate(triple.predicate);
+  }
+
+  inline proc partitionIdForPredicate(predicate: PredicateId): int {
+    return genHashKey32(predicate) % numLocales;
+  }
 
   class Segment {
     inline proc isSegmentFull(count: int = 1): bool {

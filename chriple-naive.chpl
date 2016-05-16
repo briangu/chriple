@@ -5,7 +5,7 @@
   does not make an effort to be super efficient with storage.
 
 */
-use Chasm, Common, GenHashKey32, Logging, Operand, Partition, PrivateDist, Query, Segment, Time, VisualDebug;
+use Chasm, Common, GenHashKey32, Logging, Operand, PrivateDist, Query, Segment, Time, VisualDebug;
 
 config const subjectCount = 16;
 config const predicateCount = 8;
@@ -17,25 +17,6 @@ const oRange = 0..#objectCount;
 var soCount = subjectCount * objectCount;
 
 config const verify_print = false;
-
-proc initPartitions() {
-  var t: Timer;
-  t.start();
-
-  forall p in Partitions do p = new PartitionManager(new NaiveMemorySegment());
-  forall n in NullOperand do n = new Operand();
-
-  t.stop();
-  timing("initialized partitions in ",t.elapsed(TimeUnits.microseconds), " microseconds");
-}
-
-inline proc partitionIdForTriple(triple: Triple): int {
-  return partitionIdForPredicate(triple.predicate);
-}
-
-inline proc partitionIdForPredicate(predicate: PredicateId): int {
-  return genHashKey32(predicate) % numLocales;
-}
 
 proc addTriple(triple: Triple) {
   var partitionId = partitionIdForTriple(triple);
