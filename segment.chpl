@@ -3,6 +3,7 @@ module Segment {
   use Common, GenHashKey32, Logging, ObjectPool, Operand, PrivateDist, Sort, Time, Query;
 
   // Globally reusable Null / empty singleton operand
+  var Partitions: [PrivateSpace] Segment;
   var NullOperand: [PrivateSpace] Operand;
   var Partitions: [PrivateSpace] Segment;
 
@@ -46,14 +47,16 @@ module Segment {
       yield new QueryResult();
     }
 
-    proc operandForScanPredicate(subjectIds: [?S] EntityId, predicateIds: [?P] PredicateId, objectIds: [?O] EntityId): Operand {
+    proc operandForPredicate(predicateId): Operand {
       halt("not implemented");
       return NullOperand[here.id];
     }
 
+    proc allPredicateEntries() {}
+
     proc optimize() {}
 
-    iter dump(): Triple { halt(); yield new Triple(0,0,0); }
+    iter fullscan(): Triple { halt(); yield new Triple(0,0,0); }
   }
 
   class PredicateEntry {
@@ -91,7 +94,7 @@ module Segment {
       // TODO: remove duplicates
     }
 
-    iter dump(): Triple {
+    iter fullscan(): Triple {
       for i in 0..#count do yield toTriple(soEntries[i], predicate);
     }
   }
@@ -384,7 +387,7 @@ module Segment {
       var entry: PredicateEntry;
 
       local {
-        var entryIndex = predicateHashTableIndexForTriple(triple);;
+        var entryIndex = predicateHashTableIndexForTriple(triple);
         entry = predicateHashTable[entryIndex];
         while (predicateHashTable[entryIndex] != nil) {
           if (entry.predicate == triple.predicate) {
@@ -457,49 +460,20 @@ module Segment {
       }
     }
 
-    proc populateAllPredicateEntries(ref allPredicateEntries: [0..#totalPredicateCount] PredicateEntry) {
-      return allPredicateEntries;
+    proc operandForPredicate(predicateId: PredicateId): Operand {
+      return getEntryForPredicateId(predicateId);
     }
 
-    proc operandForScanPredicate(subjectIds: [?S] EntityId, predicateIds: [?P] PredicateId, objectIds: [?O] EntityId): Operand {
-      var entryOperand: Operand;
-
-      if (predicateIds.size == 0) {
-        /*info("operandForScanPredicate: predicateIds.size == 0");*/
-        var predicateEntries: [0..#totalPredicateCount] PredicateEntry;
-        var idx: int;
-        for entry in predicateHashTable {
-          if entry != nil {
-            predicateEntries[idx] = entry;
-            idx += 1;
-          }
-        }
-        if (idx > 0) {
-          entryOperand = new MultiPredicateEntryOperand(idx, predicateEntries, subjectIds.size, subjectIds, objectIds.size, objectIds);
-        }
-      } else if (predicateIds.size == 1) {
-        /*info("operandForScanPredicate: predicateIds.size == 1");*/
-        var entry = getEntryForPredicateId(predicateIds[0]);
+    proc allPredicateEntries() {
+      var predicateEntries: [0..#totalPredicateCount] PredicateEntry;
+      var idx: int;
+      for i in predicateHashTable.domain {
+        var entry = predicateHashTable[i];
         if (entry != nil) {
-          entryOperand = new PredicateEntryOperand(entry, subjectIds.size, subjectIds, objectIds.size, objectIds);
-        }
-      } else {
-        /*info("operandForScanPredicate: predicateIds.size == ", predicateIds.size);*/
-        var predicateEntries: [0..#predicateIds.size] PredicateEntry;
-        var idx: int;
-        for i in predicateIds {
-          var entry = predicateHashTable[i];
-          if entry != nil {
-            predicateEntries[idx] = entry;
-            idx += 1;
-          }
-        }
-        if (idx > 0) {
-          entryOperand = new MultiPredicateEntryOperand(idx, predicateEntries, subjectIds.size, subjectIds, objectIds.size, objectIds);
+          predicateEntries[idx] = entry;
+          idx += 1;
         }
       }
-
-      return if entryOperand != nil then entryOperand else NullOperand[here.id];
     }
 
     proc optimize() {
@@ -509,11 +483,11 @@ module Segment {
       }
     }
 
-    iter dump(): Triple {
+    iter fullscan(): Triple {
       for i in predicateHashTable.domain {
         var entry = predicateHashTable[i];
         if (entry) {
-          for triple in entry.dump() do yield triple;
+          for triple in entry.fullscan() do yield triple;
         }
       }
     }

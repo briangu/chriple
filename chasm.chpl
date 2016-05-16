@@ -264,6 +264,61 @@ module Chasm {
     }
   }
 
+  proc operandForScanPredicate(subjectIds: [?S] EntityId, predicateIds: [?P] PredicateId, objectIds: [?O] EntityId): Operand {
+    var entryOperand: Operand;
+
+    if (predicateIds.size == 0) {
+      /*info("operandForScanPredicate: predicateIds.size == 0");*/
+      // Get predicate count for all partitions
+      var predicateEntries: [0..#totalPredicateCount] PredicateEntry;
+      var idx: int;
+      for loc in Locales do on loc {
+        var partitionPredicateEntries =  Partitions[here.id].segment.allPredicateEntries();
+        for entry in partitionPredicateEntries {
+          predicateEntries[idx] = entry;
+          idx += 1;
+        }
+      }
+      if (idx > 0) {
+        entryOperand = new MultiPredicateEntryOperand(idx, predicateEntries, subjectIds.size, subjectIds, objectIds.size, objectIds);
+      }
+    } else if (predicateIds.size == 1) {
+      /*info("operandForScanPredicate: predicateIds.size == 1");*/
+      var predicateEntries: [0..#totalPredicateCount] PredicateEntry;
+      var idx: int;
+      for loc in Locales do on loc {
+        for predicateId in predicateIds {
+          var entry = Partitions[here.id].segment.operandForPredicate(predicateId);
+          if (entry != nil) {
+            predicateEntries[idx] = entry;
+            idx += 1;
+          }
+        }
+      }
+      if (idx > 0) {
+        entryOperand = new PredicateEntryOperand(entry, subjectIds.size, subjectIds, objectIds.size, objectIds);
+      }
+    } else {
+      /*info("operandForScanPredicate: predicateIds.size == ", predicateIds.size);*/
+      var predicateEntries: [0..#totalPredicateCount] PredicateEntry;
+      var idx: int;
+      for loc in Locales do on loc {
+        for predicateId in predicateIds {
+          var entry = Partitions[here.id].segment.operandForPredicate(predicateId);
+          if (entry != nil) {
+            predicateEntries[idx] = entry;
+            idx += 1;
+          }
+        }
+      }
+      if (idx > 0) {
+        entryOperand = new MultiPredicateEntryOperand(idx, predicateEntries, subjectIds.size, subjectIds, objectIds.size, objectIds);
+      }
+    }
+
+    return if entryOperand != nil then entryOperand else NullOperand[here.id];
+  }
+
   /**
     Intepret a query instruction sequence into a query AST object tree.
   */
@@ -296,7 +351,7 @@ module Chasm {
       var op = reader.read();
       select op {
         when CHASM_HALT           do break;
-        when CHASM_SCAN_PREDICATE do push(segment.operandForScanPredicate(reader.readSubjectIds(), reader.readPredicateIds(), reader.readObjectIds()));
+        when CHASM_SCAN_PREDICATE do push(operandForScanPredicate(reader.readSubjectIds(), reader.readPredicateIds(), reader.readObjectIds()));
         when CHASM_AND            do push(new IntersectionOperand(reader.readSPOMode(), pop(), pop()));
         when CHASM_OR             do push(new UnionOperand(reader.readSPOMode(), pop(), pop()));
       }

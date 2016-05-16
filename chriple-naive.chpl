@@ -47,12 +47,7 @@ proc addSyntheticData() {
 }
 
 iter localQuery(query: Query) {
-  var lq: Query;
-  if (query.locale.id != here.id) {
-    var lq: Query = new Query(query);
-  } else {
-    lq = query;
-  }
+  var lq = if (query.locale.id != here.id) then new Query(query) else query;
   local {
     for res in Partitions[here.id].query(lq) {
       yield res;
@@ -64,7 +59,13 @@ iter localQuery(query: Query) {
 iter query(query: Query) {
 
   var totalCounts = 0;
-  var outerResults: [0..(Locales.size * query.partitionLimit)-1] QueryResult;
+  var segment = new NaiveMemorySegment();
+
+  // Since iterators cannot be stepped manually (e.g. with next()),
+  // in order to apply cross partition operands, we need to spool partition
+  // results into a local memory segment.  This will possibly result in a
+  // shortcoming of results if the local operand filters out many of the spooled
+  // results, so to compensate for that the query should have a larger partition limit.
 
   // TODO: we should scope locales by which locales are needed by the operand tree
   for loc in Locales {
@@ -72,29 +73,33 @@ iter query(query: Query) {
       // copy query into locale
       var lq: Query = new Query(query);
 
-      var innerResults: [0..lq.partitionLimit-1] QueryResult;
+      var innerResults: [0..#lq.partitionLimit] Triple;
       var innerCount = 0;
 
-      local {
+      {
         for res in localQuery(lq) {
-          innerResults[innerCount] = res;
+          if lq.debug then writeln(res.triple);
+          innerResults[innerCount] = res.triple;
           innerCount += 1;
-          if (innerCount > innerResults.domain.high) {
-            break;
-          }
+          if (innerCount >= lq.partitionLimit) then break;
         }
       }
 
       if (innerCount > 0) {
-        outerResults[totalCounts..totalCounts+innerCount-1] = innerResults[0..innerCount-1];
+        on segment {
+          segment.addTriples(innerResults[0..#innerCount]);
+        }
         totalCounts += innerCount;
       }
     }
   }
 
-  for i in 0..totalCounts-1 {
-    yield outerResults[i];
+  // apply the query to the local segment
+  for t in segment.query(query) {
+    yield t;
   }
+
+  delete segment;
 }
 
 proc printTriples(q: Query) {
@@ -407,7 +412,7 @@ proc querySyntheticData() {
     w.writeObjectId(3);
     w.writeObjectId(4);
 
-    // B = (2,3,[2,3])
+    // B = (2,2,[2,3])
     /*
     (subject = 2, predicate = 2, object = 2)
     (subject = 2, predicate = 2, object = 3)
@@ -435,6 +440,59 @@ proc querySyntheticData() {
 
     writeln("intersect triple objects of the form (1..2, 2..2, 2..3)");
     verifyTriples(1..2, 2..2, 2..3, q);
+  }
+  {
+    q.instructionBuffer.clear();
+    q.debug = true;
+    var w = new InstructionWriter(q.instructionBuffer);
+    // A = (1,2,1..4)
+    /*
+    (subject = 1, predicate = 2, object = 1)
+    (subject = 1, predicate = 2, object = 2)
+    (subject = 1, predicate = 2, object = 3)
+    (subject = 1, predicate = 2, object = 4)
+    */
+    w.writeScanPredicate();
+    w.writeCount(1);
+    w.writeSubjectId(1);
+    w.writeCount(1);
+    w.writePredicateId(2);
+    w.writeCount(4);
+    w.writeObjectId(1);
+    w.writeObjectId(2);
+    w.writeObjectId(3);
+    w.writeObjectId(4);
+
+    // B = (2,3,[2,3])
+    /*
+    (subject = 2, predicate = 3, object = 2)
+    (subject = 2, predicate = 3, object = 3)
+    */
+    w.writeScanPredicate();
+    w.writeCount(1);
+    w.writeObjectId(2);
+    w.writeCount(1);
+    w.writePredicateId(3);
+    w.writeCount(2);
+    w.writeSubjectId(2);
+    w.writeSubjectId(3);
+
+    // A.object AND B.object
+    /*
+    (subject = 2, predicate = 3, object = 2)
+    (subject = 1, predicate = 2, object = 2)
+    (subject = 2, predicate = 3, object = 3)
+    (subject = 1, predicate = 2, object = 3)
+    */
+    w.writeAnd();
+    w.writeSPOMode(OperandSPOModeObject);
+
+    w.writeHalt();
+
+    writeln("intersect triple objects of the form (1..2, 2..3, 2..3)");
+    printTriples(q);
+    /*verifyTriples(1..2, 2..3, 2..3, q);*/
+    q.debug = false;
   }
 }
 
