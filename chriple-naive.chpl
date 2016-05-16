@@ -56,7 +56,7 @@ iter localQuery(query: Query) {
 }
 
 // serial iterator
-iter query(query: Query) {
+iter queryWithLocalSegment(query: Query) {
 
   var totalCounts = 0;
   var segment = new NaiveMemorySegment();
@@ -100,6 +100,13 @@ iter query(query: Query) {
   }
 
   delete segment;
+}
+
+iter query(query: Query) {
+  var op = chasmInterpret(query);
+  for res in op.evaluate() {
+    yield res;
+  }
 }
 
 proc printTriples(q: Query) {

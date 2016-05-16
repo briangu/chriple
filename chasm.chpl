@@ -284,18 +284,9 @@ module Chasm {
       }
     } else if (predicateIds.size == 1) {
       /*info("operandForScanPredicate: predicateIds.size == 1");*/
-      var predicateEntries: [0..#totalPredicateCount] PredicateEntry;
-      var idx: int;
-      for loc in Locales do on loc {
-        for predicateId in predicateIds {
-          var entry = Partitions[here.id].segment.operandForPredicate(predicateId);
-          if (entry != nil) {
-            predicateEntries[idx] = entry;
-            idx += 1;
-          }
-        }
-      }
-      if (idx > 0) {
+      var partitionId = partitionIdForPredicate(predicateIds[0]);
+      var entry = Partitions[partitionId].segment.operandForPredicate(predicateId);
+      if (entry != nil) {
         entryOperand = new PredicateEntryOperand(entry, subjectIds.size, subjectIds, objectIds.size, objectIds);
       }
     } else {

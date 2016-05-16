@@ -3,7 +3,6 @@ module Segment {
   use Common, GenHashKey32, Logging, ObjectPool, Operand, PrivateDist, Sort, Time, Query;
 
   // Globally reusable Null / empty singleton operand
-  var Partitions: [PrivateSpace] Segment;
   var NullOperand: [PrivateSpace] Operand;
   var Partitions: [PrivateSpace] Segment;
 
