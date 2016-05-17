@@ -97,11 +97,10 @@ proc populateLocalSegment(partitionQueries: [0..#numLocales] Query): Segment {
 iter query(query: Query) {
   var partitionQueries: [0..#numLocales] Query;
   for p in partitionQueries do p = query;
-  var segment = populateLocalSegment(partitionQueries);
-  for r in segment.query(query) do yield r;
+  for r in queryWithPartitionQueries(partitionQueries, query) do yield r;
 }
 
-iter queryWithLocalSegment(partitionQueries: [0..#numLocales] Query, topQuery: Query) {
+iter queryWithPartitionQueries(partitionQueries: [0..#numLocales] Query, topQuery: Query) {
   var segment = populateLocalSegment(partitionQueries);
   for t in segment.query(topQuery) do yield t;
   delete segment;
@@ -109,6 +108,12 @@ iter queryWithLocalSegment(partitionQueries: [0..#numLocales] Query, topQuery: Q
 
 proc printTriples(q: Query) {
   for result in query(q) {
+    writeln(result.triple);
+  }
+}
+
+proc printPartitionQueryTriples(partitionQueries: [0..#numLocales] Query, topQuery: Query) {
+  for result in queryWithPartitionQueries(partitionQueries, topQuery) {
     writeln(result.triple);
   }
 }
@@ -129,13 +134,44 @@ proc verifyTriples(sRange, pRange, oRange, q: Query) {
   verifyTriplesWithArray(createTripleVerificationArray(sRange, pRange, oRange), q);
 }
 
-proc verifyTriplesWithArray(ref triples, q: Query) {
+proc verifyTriplesWithArray(triples, q: Query) {
 
   const sRange = triples.domain.dim(1);
   const pRange = triples.domain.dim(2);
   const oRange = triples.domain.dim(3);
 
   for result in query(q) {
+    var t = result.triple;
+    if (verify_print) then writeln(t);
+
+    if (t.subject < sRange.low && t.subject > sRange.high) then halt("t.subject < sRange.low && t.subject > sRange.high");
+    if (t.predicate < pRange.low && t.predicate > pRange.high) then halt("t.predicate < pRange.low && t.predicate > pRange.high");
+    if (t.object < oRange.low && t.object > oRange.high) then halt("t.object < oRange.low && t.object > oRange.high");
+
+    if (!triples[t.subject, t.predicate, t.object]) then halt("tuple not found: ", t);
+
+    // mark the tuple as touched
+    triples[t.subject, t.predicate, t.object] = false;
+  }
+
+  var failed = false;
+  for (s,p,o) in triples.domain {
+    var t = triples[s,p,o];
+    if (t) {
+      writeln(" (", s, " ", p, " ", o, ") was not verified.");
+      failed = true;
+    }
+  }
+  if (failed) then halt("found triples which were not verified.");
+}
+
+proc verifyPartitionQueryTriplesWithArray(triples, partitionQueries: [0..#numLocales] Query, topQuery: Query) {
+
+  const sRange = triples.domain.dim(1);
+  const pRange = triples.domain.dim(2);
+  const oRange = triples.domain.dim(3);
+
+  for result in queryWithPartitionQueries(partitionQueries, topQuery) {
     var t = result.triple;
     if (verify_print) then writeln(t);
 
@@ -195,8 +231,8 @@ proc verifyOperand(sRange, pRange, oRange, op: Operand) {
   if (failed) then halt("found triples which were not verified.");
 }
 
-proc querySyntheticData() {
-  var q = new Query(new InstructionBuffer(2048));
+proc testSimpleQueries() {
+  var q = new Query(new InstructionBuffer());
   {
     q.instructionBuffer.clear();
     var w = new InstructionWriter(q.instructionBuffer);
@@ -379,6 +415,54 @@ proc querySyntheticData() {
 
     writeln("intersect triple objects of the form (1..2, 2..2, 2..3)");
     verifyTriples(1..2, 2..2, 2..3, q);
+  }
+}
+
+proc testComplexQueries() {
+  {
+    var partitionQuries: [0..#numLocales] Query;
+    partitionQuries[0] = new Query(new InstructionBuffer());
+    partitionQuries[0].getWriter().writeScanPredicate(1, 1, 1, 2, 1, 3);
+    partitionQuries[1] = new Query(new InstructionBuffer());
+    partitionQuries[1].getWriter().writeScanPredicate(1, 1, 1, 3, 1, 4);
+
+    var topQuery = new Query(new InstructionBuffer());
+    var w = topQuery.getWriter();
+    w.writeScanPredicate(0,1,2,0);
+    w.writeScanPredicate(0,1,3,0);
+    w.writeAndWithMode(OperandSPOModeSubject);
+
+    writeln("intersect triple objects of the form [1,2,3] Subject AND [1,3,4]");
+    var triples = createTripleVerificationArray(1..1, 2..3, 3..4);
+    triples[1,2,4] = false;
+    triples[1,3,3] = false;
+    verifyPartitionQueryTriplesWithArray(triples, partitionQuries, topQuery);
+  }
+
+  {
+    var partitionQuries: [0..#numLocales] Query;
+    partitionQuries[0] = new Query(new InstructionBuffer());
+    partitionQuries[0].getWriter().writeScanPredicate(1, 1, 1, 2, 1, 3);
+    partitionQuries[1] = new Query(new InstructionBuffer());
+    partitionQuries[1].getWriter().writeScanPredicate(1, 2, 1, 3, 1, 4);
+
+    var topQuery = new Query(new InstructionBuffer());
+    var w = topQuery.getWriter();
+    w.writeScanPredicate(0,1,2,0);
+    w.writeScanPredicate(0,1,3,0);
+    w.writeOrWithMode(OperandSPOModeSubject);
+
+    writeln("intersect triple objects of the form [1,2,3] Subject OR [1,3,4]");
+    var triples = createTripleVerificationArray(1..2, 2..3, 3..4);
+    /*triples[1,2,3] = false;*/
+    triples[1,2,4] = false;
+    triples[2,2,3] = false;
+    triples[2,2,4] = false;
+    triples[1,3,3] = false;
+    triples[1,3,4] = false;
+    triples[2,3,3] = false;
+    /*triples[2,3,4] = false;*/
+    verifyPartitionQueryTriplesWithArray(triples, partitionQuries, topQuery);
   }
 }
 
@@ -595,6 +679,6 @@ proc main() {
   writeln("test queries");
   initPartitions();
   addSyntheticData();
-  querySyntheticData();
-  /*dump();*/
+  testSimpleQueries();
+  testComplexQueries();
 }

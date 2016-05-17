@@ -17,5 +17,13 @@ module Query {
       instructionBuffer.buffer = otherIB.buffer;
       partitionLimit = query.partitionLimit;
     }*/
+
+    proc getWriter(): InstructionWriter {
+      return new InstructionWriter(instructionBuffer);
+    }
+
+    proc getReader(): InstructionReader {
+      return new InstructionReader(instructionBuffer);
+    }
   }
 }

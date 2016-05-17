@@ -43,7 +43,7 @@ module Chasm {
   const CHASM_OR:   ChasmOp = 3: ChasmOp;
 
   class InstructionBuffer {
-    var count: uint;
+    var count: uint = 128;
     var buffer: [0..#count] ChasmOp;
     var offset: int;
 
@@ -170,12 +170,11 @@ module Chasm {
         return false;
       }
 
-      instructions.write((count >> 24): ChasmOp);
-      instructions.write(((count & 0x00FF0000) >> 16): ChasmOp);
-      instructions.write(((count & 0x0000FF00) >> 8): ChasmOp);
-      instructions.write(count: ChasmOp);
-
-      return true;
+      return
+        instructions.write((count >> 24): ChasmOp) &&
+        instructions.write(((count & 0x00FF0000) >> 16): ChasmOp) &&
+        instructions.write(((count & 0x0000FF00) >> 8): ChasmOp) &&
+        instructions.write(count: ChasmOp);
     }
 
     proc writeSubjectId(subjectId: EntityId): bool {
@@ -192,12 +191,11 @@ module Chasm {
         return false;
       }
 
-      instructions.write((entityId >> 24): ChasmOp);
-      instructions.write(((entityId & 0x00FF0000) >> 16): ChasmOp);
-      instructions.write(((entityId & 0x0000FF00) >> 8): ChasmOp);
-      instructions.write(entityId: ChasmOp);
-
-      return true;
+      return
+        instructions.write((entityId >> 24): ChasmOp) &&
+        instructions.write(((entityId & 0x00FF0000) >> 16): ChasmOp) &&
+        instructions.write(((entityId & 0x0000FF00) >> 8): ChasmOp) &&
+        instructions.write(entityId: ChasmOp);
     }
 
     proc writePredicateId(predicateId: PredicateId): bool {
@@ -206,12 +204,11 @@ module Chasm {
         return false;
       }
 
-      instructions.write((predicateId >> 24): ChasmOp);
-      instructions.write(((predicateId & 0x00FF0000) >> 16): ChasmOp);
-      instructions.write(((predicateId & 0x0000FF00) >> 8): ChasmOp);
-      instructions.write(predicateId: ChasmOp);
-
-      return true;
+      return
+        instructions.write((predicateId >> 24): ChasmOp) &&
+        instructions.write(((predicateId & 0x00FF0000) >> 16): ChasmOp) &&
+        instructions.write(((predicateId & 0x0000FF00) >> 8): ChasmOp) &&
+        instructions.write(predicateId: ChasmOp);
     }
 
     proc writeSPOMode(spoMode: OperandSPOMode): bool {
@@ -220,9 +217,7 @@ module Chasm {
         return false;
       }
 
-      instructions.write(spoMode: ChasmOp);
-
-      return true;
+      return instructions.write(spoMode: ChasmOp);
     }
 
     proc writeScanPredicate(): bool {
@@ -231,9 +226,7 @@ module Chasm {
         return false;
       }
 
-      instructions.write(CHASM_SCAN_PREDICATE: ChasmOp);
-
-      return true;
+      return instructions.write(CHASM_SCAN_PREDICATE: ChasmOp);
     }
 
     proc writeScanPredicate(args: int ...?n): bool {
@@ -281,6 +274,10 @@ module Chasm {
       return instructions.write(CHASM_AND);
     }
 
+    proc writeAndWithMode(mode: OperandSPOMode): bool {
+      return writeAnd() && writeSPOMode(mode);
+    }
+
     proc writeOr(): bool {
       if (!instructions.canAdvance(1)) {
         error("writeOr is out of instruction space for CHASM_OR at offset ", instructions.offset);
@@ -288,6 +285,10 @@ module Chasm {
       }
 
       return instructions.write(CHASM_OR);
+    }
+
+    proc writeOrWithMode(mode: OperandSPOMode): bool {
+      return writeOr() && writeSPOMode(mode);
     }
 
     proc writeHalt(): bool {
