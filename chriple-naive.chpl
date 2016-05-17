@@ -69,10 +69,7 @@ proc populateLocalSegment(partitionQueries: [0..#numLocales] Query): Segment {
       var otherIB = partitionQueries[here.id].instructionBuffer;
       var instructionBuffer = new InstructionBuffer(otherIB.count);
       instructionBuffer.buffer = otherIB.buffer;
-      var lq = new Query(instructionBuffer);
-      assert(lq.locale.id == here.id);
-      assert(lq.instructionBuffer.locale.id == here.id);
-      assert(lq.instructionBuffer.buffer.locale.id == here.id);
+      var lq = new Query(instructionBuffer, partitionQueries[here.id].partitionLimit);
 
       var innerResults: [0..#lq.partitionLimit] Triple;
       var innerCount = 0;

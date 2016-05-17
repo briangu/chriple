@@ -10,14 +10,12 @@ module Query {
     var instructionBuffer: InstructionBuffer;
     var partitionLimit: int = 2048;
 
-    proc Query(query: Query) {
-      writeln(here.id, " ", query.locale.id, " ", query.instructionBuffer.locale.id); //, " ", query.instructionBuffer.buffer.locale.id);
+    // For some reason, creating a copy construtor fails to work correctly on multiple locales
+    /*proc Query(query: Query) {
       var otherIB = query.instructionBuffer;
       instructionBuffer = new InstructionBuffer(otherIB.count);
-      for (x,y) in zip(instructionBuffer.buffer, otherIB.buffer) {
-        x = y;
-      }
+      instructionBuffer.buffer = otherIB.buffer;
       partitionLimit = query.partitionLimit;
-    }
+    }*/
   }
 }

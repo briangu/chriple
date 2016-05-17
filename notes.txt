@@ -1,1 +1,117 @@
 recursion with inline functions compile error
+
+
+In order to allow for results to be represented by 64-bit integers, here are a few ideas:
+
+Idea 1: scope ids to predicates
+
+We can scope the SO IDs to the predicate ID.  A result for a particular predicate will be of
+the form:
+
+  <predicate ID><subject ID><object ID>
+
+having the following bit-widths:
+
+  2**16 -> number of predicates
+  2**24 -> number of subjects for predicate P
+  2**24 -> number of objects for predicate P
+
+partition scoped SO IDs
+
+  PID ->  Global ID (predicate ID)
+  PSID -> Global ID (predicate subject ID)
+  POID -> Global ID (predicate object ID)
+
+A Global ID is the absolute 64-bit reference for a noun and predicate
+
+Idea 2: 32-bit fixed width SO nouns
+
+<predicate ID> -> <subject ID><object ID>
+
+where predicate ID is contectual based on hash partition and needs to be
+considered in the query and insert contexts.
+
+  predicate ID -> 32-bit
+  subject ID => 32-bit
+  object ID => 32-bit
+
+for now, inserts require a full scan of the predicate hash bucket.
+this will likely only be a problem for predicates which have a large number of entries.
+can consider doing a hash table for S and a hash on O to reduce query times
+
+
+Idea 3:
+
+Simple predicate hash partitions with full scan on each partition as needed.
+
+  predicate ID -> 16-bit
+  subject ID => 24-bit
+  object ID => 24-bit
+
+results are streamed back as 64-bit integers.
+
+HP -> local predicate hash -> sorted predicate slab chains for SO and OS
+
+slab ->
+  const max_count
+  atomic count
+  atomic next
+  entries: [] uint(64)
+
+slab pool
+
+  [] [array of slab records]
+  []
+  []
+  []
+
+** ordered OS could be indices into SO, which may be much smaller in size
+  SO [123,456,789]
+  OS [0,2,1] (pointing into SO) (save 50% on size?)
+  8 * N + 4 * N = 12 * N
+  e.g. given 2B triples over 16 locales, this would yield 1.6GB storage per locale
+  OS lookups would be slower due to indirection
+  ...
+  48 / 8 = 6
+  64bit -> {[48] + [16} + {32] + [32} + {16] + [48]}  cycles every three uint(64)
+  6 * N + 8 * N = 14 * N (allows for 2^32 entries per partition)
+
+  SO 6 * OS 6 -> 12 * N (allows for IDs up to 2^24)
+  SO 8 * OS 8 -> 12 * N (allows for IDs up to 2^24)
+
+
+allow for ordering slab entries to optimize lookups
+preprocess data to ensure sorted inserts
+
+Idea 5:
+
+There are two primary hash partitions:
+
+  1. Predicate hash partitions
+  2. Noun (S or O) hash partitions
+
+1. Predicate hash partitions
+
+  GPID = global predicate ID
+  PID = predicate ID
+  H = hash partition algorithm
+  PPID = predicate partition id
+  H(PID) -> PPID
+
+  On predicate partition:
+
+  PID = predicate ID
+  LPH = local predicate hash algorithm
+  LPHT = local predicate hash table
+  LPHTID = local predicate hash table ID
+  LPHTB = LPHT partition bucket
+    PID = predicate ID
+    SOEntries -> chain of SO entry slabs
+  SOEntry
+    max_entries
+    current_entry_count <atomic>
+    next slab id
+    entries
+
+
+2. Node (S or O) hash partitions
