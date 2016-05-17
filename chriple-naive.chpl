@@ -46,55 +46,68 @@ proc addSyntheticData() {
   /*stopVdebug();*/
 }
 
-iter localQuery(query: Query) {
-  var lq: Query;
-  if (query.locale.id != here.id) {
-    var lq: Query = new Query(query);
-  } else {
-    lq = query;
-  }
+/*iter localQuery(query: Query) {
+  var lq = if (query.instructionBuffer.locale.id != here.id) then new Query(query) else query;
   local {
-    for res in Partitions[here.id].query(lq) {
-      yield res;
-    }
+    for res in Partitions[here.id].query(lq) do yield res;
   }
-}
+}*/
 
-// serial iterator
-iter query(query: Query) {
+// Since iterators cannot be stepped manually (e.g. with next()),
+// in order to apply cross partition operands, we need to spool partition
+// results into a local memory segment.  This will possibly result in a
+// shortcoming of results if the local operand filters out many of the spooled
+// results, so to compensate for that the query should have a larger partition limit.
+proc populateLocalSegment(partitionQueries: [0..#numLocales] Query): Segment {
+  var segment = new NaiveMemorySegment();
 
-  var totalCounts = 0;
-  var outerResults: [0..(Locales.size * query.partitionLimit)-1] QueryResult;
-
-  // TODO: we should scope locales by which locales are needed by the operand tree
   for loc in Locales {
+    if (partitionQueries[loc.id].instructionBuffer == nil) then continue;
+
     on loc {
       // copy query into locale
-      var lq: Query = new Query(query);
+      var otherIB = partitionQueries[here.id].instructionBuffer;
+      var instructionBuffer = new InstructionBuffer(otherIB.count);
+      instructionBuffer.buffer = otherIB.buffer;
+      var lq = new Query(instructionBuffer);
+      assert(lq.locale.id == here.id);
+      assert(lq.instructionBuffer.locale.id == here.id);
+      assert(lq.instructionBuffer.buffer.locale.id == here.id);
 
-      var innerResults: [0..lq.partitionLimit-1] QueryResult;
+      var innerResults: [0..#lq.partitionLimit] Triple;
       var innerCount = 0;
 
       local {
-        for res in localQuery(lq) {
-          innerResults[innerCount] = res;
+        for res in Partitions[here.id].query(lq) {
+          innerResults[innerCount] = res.triple;
           innerCount += 1;
-          if (innerCount > innerResults.domain.high) {
-            break;
-          }
+          if (innerCount >= lq.partitionLimit) then break;
         }
       }
 
       if (innerCount > 0) {
-        outerResults[totalCounts..totalCounts+innerCount-1] = innerResults[0..innerCount-1];
-        totalCounts += innerCount;
+        on segment {
+          segment.addTriples(innerResults[0..#innerCount]);
+        }
       }
     }
   }
 
-  for i in 0..totalCounts-1 {
-    yield outerResults[i];
-  }
+  return segment;
+}
+
+// serial iterator
+iter query(query: Query) {
+  var partitionQueries: [0..#numLocales] Query;
+  for p in partitionQueries do p = query;
+  var segment = populateLocalSegment(partitionQueries);
+  for r in segment.query(query) do yield r;
+}
+
+iter queryWithLocalSegment(partitionQueries: [0..#numLocales] Query, topQuery: Query) {
+  var segment = populateLocalSegment(partitionQueries);
+  for t in segment.query(topQuery) do yield t;
+  delete segment;
 }
 
 proc printTriples(q: Query) {

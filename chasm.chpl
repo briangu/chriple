@@ -44,8 +44,8 @@ module Chasm {
 
   class InstructionBuffer {
     var count: uint;
-    var buffer: [0..count-1] ChasmOp;
-    var offset = 0: uint;
+    var buffer: [0..#count] ChasmOp;
+    var offset: int;
 
     inline proc atEnd(): bool {
       return (offset >= count);
@@ -64,7 +64,7 @@ module Chasm {
       offset += 1;
     }
 
-    inline proc canAdvance(increment: uint): bool {
+    inline proc canAdvance(increment: int): bool {
       return (offset + increment) <= count;
     }
 
@@ -270,7 +270,7 @@ module Chasm {
   proc chasmInterpret(segment: Segment, instructionBuffer: InstructionBuffer): Operand {
 
     var reader = new InstructionReader(instructionBuffer);
-    var stack: [0..1023] Operand;
+    var stack: [0..#1024] Operand;
     var stackPtr = stack.domain.high + 1;
 
     inline proc push(op: Operand) {

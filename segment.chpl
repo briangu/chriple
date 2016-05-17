@@ -387,9 +387,7 @@ module Segment {
         var entryIndex = predicateHashTableIndexForTriple(triple);;
         entry = predicateHashTable[entryIndex];
         while (predicateHashTable[entryIndex] != nil) {
-          if (entry.predicate == triple.predicate) {
-            return entry;
-          }
+          if (entry.predicate == triple.predicate) then return entry;
           entryIndex = (entryIndex + 1) % predicateHashTableCount;
           entry = predicateHashTable[entryIndex];
         }

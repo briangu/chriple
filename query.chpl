@@ -11,8 +11,12 @@ module Query {
     var partitionLimit: int = 2048;
 
     proc Query(query: Query) {
-      instructionBuffer = new InstructionBuffer(query.instructionBuffer.count);
-      instructionBuffer.buffer = query.instructionBuffer.buffer;
+      writeln(here.id, " ", query.locale.id, " ", query.instructionBuffer.locale.id); //, " ", query.instructionBuffer.buffer.locale.id);
+      var otherIB = query.instructionBuffer;
+      instructionBuffer = new InstructionBuffer(otherIB.count);
+      for (x,y) in zip(instructionBuffer.buffer, otherIB.buffer) {
+        x = y;
+      }
       partitionLimit = query.partitionLimit;
     }
   }
