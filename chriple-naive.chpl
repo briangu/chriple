@@ -449,10 +449,62 @@ proc testComplexQueries() {
     var topQuery = new Query(new InstructionBuffer());
     var w = topQuery.getWriter();
     w.writeScanPredicate(0,1,2,0);
-    w.writeScanPredicate(0,1,3,0);
+    w.writeScanPredicate(0,1,3,1,4);
     w.writeOrWithMode(OperandSPOModeSubject);
 
-    writeln("intersect triple objects of the form [1,2,3] Subject OR [1,3,4]");
+    writeln("intersect triple objects of the form [*,2,*] Subject OR [*,3,4]");
+    var triples = createTripleVerificationArray(1..2, 2..3, 3..4);
+    /*triples[1,2,3] = false;*/
+    triples[1,2,4] = false;
+    triples[2,2,3] = false;
+    triples[2,2,4] = false;
+    triples[1,3,3] = false;
+    triples[1,3,4] = false;
+    triples[2,3,3] = false;
+    /*triples[2,3,4] = false;*/
+    verifyPartitionQueryTriplesWithArray(triples, partitionQuries, topQuery);
+  }
+
+  {
+    var partitionQuries: [0..#numLocales] Query;
+    partitionQuries[0] = new Query(new InstructionBuffer());
+    partitionQuries[0].getWriter().writeScanPredicate(1, 2, 1, 2, 1, 4);
+    partitionQuries[1] = new Query(new InstructionBuffer());
+    partitionQuries[1].getWriter().writeScanPredicate(1, 3, 1, 3, 2, 3, 4);
+
+    var topQuery = new Query(new InstructionBuffer());
+    var w = topQuery.getWriter();
+    w.writeScanPredicate(0,1,2,0);
+    w.writeScanPredicate(0,1,3,1,4);
+    w.writeAndWithMode(OperandSPOModeObject);
+
+    writeln("intersect triple objects of the form [*,2,*] Object AND [*,3,4]");
+    var triples = createTripleVerificationArray(2..3, 2..3, 3..4);
+    triples[2,2,3] = false;
+    /*triples[2,2,4] = false;*/
+    triples[2,3,3] = false;
+    triples[2,3,4] = false;
+    triples[3,2,3] = false;
+    triples[3,2,4] = false;
+    triples[3,3,3] = false;
+    /*triples[3,3,4] = false;*/
+    verifyPartitionQueryTriplesWithArray(triples, partitionQuries, topQuery);
+  }
+
+  {
+    var partitionQuries: [0..#numLocales] Query;
+    partitionQuries[0] = new Query(new InstructionBuffer());
+    partitionQuries[0].getWriter().writeScanPredicate(1, 1, 1, 2, 1, 3);
+    partitionQuries[1] = new Query(new InstructionBuffer());
+    partitionQuries[1].getWriter().writeScanPredicate(1, 2, 1, 3, 2, 3, 4);
+
+    var topQuery = new Query(new InstructionBuffer());
+    var w = topQuery.getWriter();
+    w.writeScanPredicate(0,1,2,0);
+    w.writeScanPredicate(0,1,3,1,4);
+    w.writeOrWithMode(OperandSPOModeObject);
+
+    writeln("intersect triple objects of the form [1,2,*] Object OR [1,3,4]");
     var triples = createTripleVerificationArray(1..2, 2..3, 3..4);
     /*triples[1,2,3] = false;*/
     triples[1,2,4] = false;
