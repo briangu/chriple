@@ -236,6 +236,42 @@ module Chasm {
       return true;
     }
 
+    proc writeScanPredicate(args: int ...?n): bool {
+      var k = max(1,n);
+      if (!instructions.canAdvance(1)) {
+        error("writeScanPredicate is out of instruction space for CHASM_SCAN_PREDICATE at offset ", instructions.offset);
+        return false;
+      }
+
+      instructions.write(CHASM_SCAN_PREDICATE: ChasmOp);
+
+      var w = new InstructionWriter(instructions);
+
+      var idx = 1;
+      var mode: int;
+
+      while (idx <= n) {
+        var m = args(idx);
+        idx += 1;
+        instructions.canAdvance(m);
+        w.writeCount(m:uint(32));
+        while (m > 0) {
+          if (mode == 0) {
+            w.writeSubjectId(args(idx): EntityId);
+          } else if (mode == 1) {
+            w.writePredicateId(args(idx): PredicateId);
+          } else {
+            w.writeObjectId(args(idx): EntityId);
+          }
+          m -= 1;
+          idx += 1;
+        }
+        mode += 1;
+      }
+
+      return true;
+    }
+
     proc writeAnd(): bool {
       if (!instructions.canAdvance(1)) {
         error("writeAnd is out of instruction space for CHASM_AND at offset ", instructions.offset);
