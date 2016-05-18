@@ -118,16 +118,27 @@ proc printPartitionQueryTriples(partitionQueries: [0..#numLocales] Query, topQue
   }
 }
 
-proc createTripleVerificationArray(sRange, pRange, oRange) {
+proc createTripleVerificationArray(sRange, pRange, oRange, defaultValue = true) {
   var triples: [sRange, pRange, oRange] bool;
   for s in sRange {
     for p in pRange {
       for o in oRange {
-        triples[s,p,o] = true;
+        triples[s,p,o] = defaultValue;
       }
     }
   }
   return triples;
+}
+
+proc verifyPopulatedTriples(triples) {
+  var failed = false;
+  for (s,p,o) in triples.domain {
+    if (triples[s,p,o]) {
+      writeln(" (", s, " ", p, " ", o, ") was not verified.");
+      failed = true;
+    }
+  }
+  if (failed) then halt("found triples which were not verified.");
 }
 
 proc verifyTriples(sRange, pRange, oRange, q: Query) {
@@ -154,15 +165,7 @@ proc verifyTriplesWithArray(triples, q: Query) {
     triples[t.subject, t.predicate, t.object] = false;
   }
 
-  var failed = false;
-  for (s,p,o) in triples.domain {
-    var t = triples[s,p,o];
-    if (t) {
-      writeln(" (", s, " ", p, " ", o, ") was not verified.");
-      failed = true;
-    }
-  }
-  if (failed) then halt("found triples which were not verified.");
+  verifyPopulatedTriples(triples);
 }
 
 proc verifyPartitionQueryTriplesWithArray(triples, partitionQueries: [0..#numLocales] Query, topQuery: Query) {
@@ -185,15 +188,7 @@ proc verifyPartitionQueryTriplesWithArray(triples, partitionQueries: [0..#numLoc
     triples[t.subject, t.predicate, t.object] = false;
   }
 
-  var failed = false;
-  for (s,p,o) in triples.domain {
-    var t = triples[s,p,o];
-    if (t) {
-      writeln(" (", s, " ", p, " ", o, ") was not verified.");
-      failed = true;
-    }
-  }
-  if (failed) then halt("found triples which were not verified.");
+  verifyPopulatedTriples(triples);
 }
 
 proc verifyOperand(sRange, pRange, oRange, op: Operand) {
@@ -738,6 +733,30 @@ proc testGraphExtraction() {
   extractGraph(5);
 }
 
+iter readGraphFile(fileName) {
+  var r = open(fileName, iomode.r).reader();
+  var numLines: int;
+
+  var subject: EntityId;
+  var predicate: PredicateId;
+  var object: EntityId;
+
+  r.readln(numLines);
+  for i in 0..#numLines {
+    r.read(subject);
+    r.read(predicate);
+    r.read(object);
+    yield new Triple(subject, predicate, object);
+  }
+}
+
+proc testReadGraphFile() {
+  resetPartitions();
+  var triples = createTripleVerificationArray(1..3, 1..3, 1..3);
+  for t in readGraphFile("data/graph.txt") do triples[t.subject, t.predicate, t.object] = false;
+  verifyPopulatedTriples(triples);
+}
+
 proc main() {
   writeln("testTriple:");
   testTriple();
@@ -760,4 +779,7 @@ proc main() {
 
   writeln("test graph extraction");
   testGraphExtraction();
+
+  writeln("test read graph file");
+  testReadGraphFile();
 }
