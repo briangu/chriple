@@ -1,6 +1,6 @@
 module Segment {
 
-  use Common, GenHashKey32, Logging, ObjectPool, Operand, PrivateDist, Sort, Time, Query;
+  use Common, GenHashKey32, Logging, Operand, PrivateDist, Sort, Time, Query;
 
   // Globally reusable Null / empty singleton operand
   var NullOperand: [PrivateSpace] Operand;
@@ -15,6 +15,10 @@ module Segment {
 
     t.stop();
     timing("initialized partitions in ",t.elapsed(TimeUnits.microseconds), " microseconds");
+  }
+
+  proc resetPartitions() {
+    forall p in Partitions do p.reset();
   }
 
   inline proc partitionIdForTriple(triple: Triple): int {
@@ -51,9 +55,18 @@ module Segment {
       return NullOperand[here.id];
     }
 
-    proc optimize() {}
+    proc reset() {
+      halt("not implemented");
+    }
 
-    iter dump(): Triple { halt(); yield new Triple(0,0,0); }
+    proc optimize() {
+      halt("not implemented");
+    }
+
+    iter dump(): Triple {
+      halt("not implemented");
+      yield new Triple(0,0,0);
+    }
   }
 
   class PredicateEntry {
@@ -498,6 +511,19 @@ module Segment {
       }
 
       return if entryOperand != nil then entryOperand else NullOperand[here.id];
+    }
+
+    proc reset() {
+      totalTripleCount = 0;
+      totalPredicateCount = 0;
+
+      forall i in predicateHashTable.domain {
+        var entry = predicateHashTable[i];
+        if (entry) {
+          delete entry;
+          predicateHashTable[i] = nil;
+        }
+      }
     }
 
     proc optimize() {

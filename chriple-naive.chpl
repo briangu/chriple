@@ -256,62 +256,44 @@ proc testSimpleQueries() {
   }
   {
     q.instructionBuffer.clear();
-    var w = new InstructionWriter(q.instructionBuffer);
-    w.writeScanPredicate(1, 1, 1, 2, 1, 3);
-    w.writeHalt();
-
+    q.getWriter().writeScanPredicate(1, 1, 1, 2, 1, 3);
     writeln("triples of (1,2,3)");
     verifyTriples(1..1, 2..2, 3..3, q);
   }
 
   {
     q.instructionBuffer.clear();
-    var w = new InstructionWriter(q.instructionBuffer);
-    w.writeScanPredicate(1, 1, 1, 2, 2, 3, 4);
-    w.writeHalt();
-
+    q.getWriter().writeScanPredicate(1, 1, 1, 2, 2, 3, 4);
     writeln("triples of (1,2,[3,4])");
     verifyTriples(1..1, 2..2, 3..4, q);
   }
   {
     q.instructionBuffer.clear();
-    var w = new InstructionWriter(q.instructionBuffer);
-    w.writeScanPredicate(1, 1, 0, 2, 3, 4);
-    w.writeHalt();
-
+    q.getWriter().writeScanPredicate(1, 1, 0, 2, 3, 4);
     writeln("scan all triples of the form (1,*,[3,4])");
     verifyTriples(1..1, 0..#predicateCount, 3..4, q);
   }
   {
     q.instructionBuffer.clear();
-    var w = new InstructionWriter(q.instructionBuffer);
-    w.writeScanPredicate(0, 1, 2, 2, 3, 4);
-    w.writeHalt();
-
+    q.getWriter().writeScanPredicate(0, 1, 2, 2, 3, 4);
     writeln("scan all triples of the form (*,2,[3,4])");
     verifyTriples(0..#subjectCount, 2..2, 3..4, q);
   }
   {
     q.instructionBuffer.clear();
-    var w = new InstructionWriter(q.instructionBuffer);
-    w.writeScanPredicate(1, 1, 1, 2, 0);
-    w.writeHalt();
-
+    q.getWriter().writeScanPredicate(1, 1, 1, 2, 0);
     writeln("scan all triples of the form (1,2,*])");
     verifyTriples(1..1, 2..2, 0..#objectCount, q);
   }
   {
     q.instructionBuffer.clear();
-    var w = new InstructionWriter(q.instructionBuffer);
-    w.writeScanPredicate(0, 0, 0);
-    w.writeHalt();
-
+    q.getWriter().writeScanPredicate(0, 0, 0);
     writeln("scan all triples");
     verifyTriples(0..#subjectCount, 0..#predicateCount, 0..#objectCount, q);
   }
   {
     q.instructionBuffer.clear();
-    var w = new InstructionWriter(q.instructionBuffer);
+    var w = q.getWriter();
     // A = (*,2,3)
     /*
     (subject = 1, predicate = 2, object = 3)
@@ -339,8 +321,6 @@ proc testSimpleQueries() {
     */
     w.writeOr();
     w.writeSPOMode(OperandSPOModeSubject);
-
-    w.writeHalt();
 
     writeln("union triple subjects of the form (1..4, 2..2, 3..4)");
     var triples = createTripleVerificationArray(1..4, 2..2, 3..4);
@@ -377,8 +357,6 @@ proc testSimpleQueries() {
     w.writeAnd();
     w.writeSPOMode(OperandSPOModeSubject);
 
-    w.writeHalt();
-
     writeln("intersect triple subjects of the form (2..3, 2..2, 3..4)");
     verifyTriples(2..3, 2..2, 3..4, q);
   }
@@ -410,8 +388,6 @@ proc testSimpleQueries() {
     */
     w.writeAnd();
     w.writeSPOMode(OperandSPOModeObject);
-
-    w.writeHalt();
 
     writeln("intersect triple objects of the form (1..2, 2..2, 2..3)");
     verifyTriples(1..2, 2..2, 2..3, q);
@@ -714,6 +690,54 @@ proc dump() {
   for loc in Locales do on loc do for triple in Partitions[here.id].dump() do writeln(triple);
 }
 
+proc extractGraph(startSubject: EntityId) {
+  var encounteredEntities: [0..#objectCount] bool;
+  var entityStack: [0..#objectCount] int;
+  var stackPos = 0;
+
+  var q = new Query(new InstructionBuffer());
+  entityStack[stackPos] = startSubject;
+  stackPos += 1;
+
+  while (stackPos > 0) {
+    stackPos -= 1;
+    var entityId = entityStack[stackPos];
+    q.instructionBuffer.clear();
+    q.getWriter().writeScanPredicate(1, entityId, 0, 0);
+    for r in query(q) {
+      var t = r.triple;
+      if !encounteredEntities[t.object] {
+        encounteredEntities[t.object] = true;
+        entityStack[stackPos] = t.object;
+        stackPos += 1;
+      }
+    }
+  }
+
+  for idx in 0..#objectCount {
+    if (encounteredEntities[idx]) {
+      q.instructionBuffer.clear();
+      q.getWriter().writeScanPredicate(1, idx, 0, 0);
+      for r in query(q) do writeln(r);
+    }
+  }
+}
+
+proc testGraphExtraction() {
+  resetPartitions();
+  addTriple(new Triple(1, 2, 3));
+  addTriple(new Triple(1, 2, 4));
+  addTriple(new Triple(3, 2, 1));
+  addTriple(new Triple(4, 3, 1));
+  addTriple(new Triple(5, 3, 2));
+  addTriple(new Triple(2, 4, 5));
+
+  writeln("extracting graph starting with 1");
+  extractGraph(1);
+  writeln("extracting graph starting with 5");
+  extractGraph(5);
+}
+
 proc main() {
   writeln("testTriple:");
   testTriple();
@@ -733,4 +757,7 @@ proc main() {
   addSyntheticData();
   testSimpleQueries();
   testComplexQueries();
+
+  writeln("test graph extraction");
+  testGraphExtraction();
 }
