@@ -14,7 +14,7 @@ const totalTripleCount = subjectCount * predicateCount * objectCount;
 const sRange = 0..#subjectCount;
 const pRange = 0..#predicateCount;
 const oRange = 0..#objectCount;
-var soCount = subjectCount * objectCount;
+const soCount = subjectCount * objectCount;
 
 config const verify_print = false;
 
@@ -758,6 +758,8 @@ proc testReadGraphFile() {
 }
 
 proc main() {
+  startVdebug("network");
+
   writeln("testTriple:");
   testTriple();
 
@@ -782,4 +784,6 @@ proc main() {
 
   writeln("test read graph file");
   testReadGraphFile();
+
+  stopVdebug();
 }
