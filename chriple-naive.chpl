@@ -734,20 +734,23 @@ proc testGraphExtraction() {
 }
 
 iter readGraphFile(fileName) {
-  var r = open(fileName, iomode.r).reader();
+  var f = open(fileName, iomode.r);
+  var r = f.reader();
   var numLines: int;
 
   var subject: EntityId;
   var predicate: PredicateId;
   var object: EntityId;
 
-  r.readln(numLines);
-  for i in 0..#numLines {
-    r.read(subject);
+  // only test the read of the subject and assume predicate and object are there
+  while r.read(subject) {
     r.read(predicate);
     r.read(object);
     yield new Triple(subject, predicate, object);
   }
+
+  r.close();
+  f.close();
 }
 
 proc testReadGraphFile() {
