@@ -5,23 +5,31 @@
 import sqlite3
 import gzip
 
-nounsDB = sqlite3.open("nouns.db")
-predicatesDB = sqlite3.open("predicates.db")
+nounsDBConnection = sqlite3.connect("nouns.db")
+nounsDBConnection.text_factory = str
+nounsDB = nounsDBConnection.cursor()
+
+predicatesDBConnection = sqlite3.connect("predicates.db")
+predicatesDBConnection.text_factory = str
+predicatesDB = predicatesDBConnection.cursor()
 
 def idForNoun(noun):
-    result = nounsDB.execute("SELECT id FROM nouns WHERE noun = ?", (noun,))
+    a = nounsDB.execute("SELECT id FROM nouns WHERE noun = ?", (noun, ))
+    r = a.fetchall()
+    return r[0][0] if len(r) > 0 else 0
 
 def idForPredicate(predicate):
-    result = predicatesDB.execute("SELECT id FROM predicates WHERE predicate = ?", (predicate,))
-    print(result)
+    a = predicatesDB.execute("SELECT id FROM predicates WHERE predicate = ?", (predicate, ))
+    r = a.fetchall()
+    return r[0][0] if len(r) > 0 else 0
 
-with gzip.open("freebase-latest.gz", 'r') as fin:
-    for lines in fin.read:
-        (subject, predicate, obj) = lines.strip().split(' ')
+with gzip.open("freebase-rdf-latest.gz", 'r') as fin:
+    for line in fin:
+        (subject, predicate, obj, junk) = line.strip().split('\t')
         subjectId = idForNoun(subject)
         predicateId = idForPredicate(predicate)
-        objId = idForNoun(obj, nounsDB)
-        print(subjectId, " ", predicateId, " ", objId, "\n")
+        objId = idForNoun(obj)
+        print "{} {} {}".format(subjectId, predicateId, objId)
 
-nounsDB.close()
-predicatesDB.close()
+nounsDBConnection.close()
+predicatesDBConnection.close()
