@@ -392,10 +392,12 @@ proc testSimpleQueries() {
 proc testComplexQueries() {
   {
     var partitionQuries: [0..#numLocales] Query;
-    partitionQuries[0] = new Query(new InstructionBuffer());
-    partitionQuries[0].getWriter().writeScanPredicate(1, 1, 1, 2, 1, 3);
-    partitionQuries[1] = new Query(new InstructionBuffer());
-    partitionQuries[1].getWriter().writeScanPredicate(1, 1, 1, 3, 1, 4);
+    var partitionId = partitionIdForPredicate(2);
+    partitionQuries[partitionId] = new Query(new InstructionBuffer());
+    partitionQuries[partitionId].getWriter().writeScanPredicate(1, 1, 1, 2, 1, 3);
+    partitionId = partitionIdForPredicate(3);
+    partitionQuries[partitionId] = new Query(new InstructionBuffer());
+    partitionQuries[partitionId].getWriter().writeScanPredicate(1, 1, 1, 3, 1, 4);
 
     var topQuery = new Query(new InstructionBuffer());
     var w = topQuery.getWriter();
@@ -412,10 +414,12 @@ proc testComplexQueries() {
 
   {
     var partitionQuries: [0..#numLocales] Query;
-    partitionQuries[0] = new Query(new InstructionBuffer());
-    partitionQuries[0].getWriter().writeScanPredicate(1, 1, 1, 2, 1, 3);
-    partitionQuries[1] = new Query(new InstructionBuffer());
-    partitionQuries[1].getWriter().writeScanPredicate(1, 2, 1, 3, 1, 4);
+    var partitionId = partitionIdForPredicate(2);
+    partitionQuries[partitionId] = new Query(new InstructionBuffer());
+    partitionQuries[partitionId].getWriter().writeScanPredicate(1, 1, 1, 2, 1, 3);
+    partitionId = partitionIdForPredicate(3);
+    partitionQuries[partitionId] = new Query(new InstructionBuffer());
+    partitionQuries[partitionId].getWriter().writeScanPredicate(1, 1, 1, 3, 1, 4);
 
     var topQuery = new Query(new InstructionBuffer());
     var w = topQuery.getWriter();
@@ -430,18 +434,20 @@ proc testComplexQueries() {
     triples[2,2,3] = false;
     triples[2,2,4] = false;
     triples[1,3,3] = false;
-    triples[1,3,4] = false;
+    /*triples[1,3,4] = false;*/
     triples[2,3,3] = false;
-    /*triples[2,3,4] = false;*/
+    triples[2,3,4] = false;
     verifyPartitionQueryTriplesWithArray(triples, partitionQuries, topQuery);
   }
 
   {
     var partitionQuries: [0..#numLocales] Query;
-    partitionQuries[0] = new Query(new InstructionBuffer());
-    partitionQuries[0].getWriter().writeScanPredicate(1, 2, 1, 2, 1, 4);
-    partitionQuries[1] = new Query(new InstructionBuffer());
-    partitionQuries[1].getWriter().writeScanPredicate(1, 3, 1, 3, 2, 3, 4);
+    var partitionId = partitionIdForPredicate(2);
+    partitionQuries[partitionId] = new Query(new InstructionBuffer());
+    partitionQuries[partitionId].getWriter().writeScanPredicate(1, 2, 1, 2, 1, 4);
+    partitionId = partitionIdForPredicate(3);
+    partitionQuries[partitionId] = new Query(new InstructionBuffer());
+    partitionQuries[partitionId].getWriter().writeScanPredicate(1, 3, 1, 3, 2, 3, 4);
 
     var topQuery = new Query(new InstructionBuffer());
     var w = topQuery.getWriter();
@@ -464,10 +470,12 @@ proc testComplexQueries() {
 
   {
     var partitionQuries: [0..#numLocales] Query;
-    partitionQuries[0] = new Query(new InstructionBuffer());
-    partitionQuries[0].getWriter().writeScanPredicate(1, 1, 1, 2, 1, 3);
-    partitionQuries[1] = new Query(new InstructionBuffer());
-    partitionQuries[1].getWriter().writeScanPredicate(1, 2, 1, 3, 2, 3, 4);
+    var partitionId = partitionIdForPredicate(2);
+    partitionQuries[partitionId] = new Query(new InstructionBuffer());
+    partitionQuries[partitionId].getWriter().writeScanPredicate(1, 1, 1, 2, 1, 3);
+    partitionId = partitionIdForPredicate(3);
+    partitionQuries[partitionId] = new Query(new InstructionBuffer());
+    partitionQuries[partitionId].getWriter().writeScanPredicate(1, 2, 1, 3, 2, 3, 4);
 
     var topQuery = new Query(new InstructionBuffer());
     var w = topQuery.getWriter();
@@ -760,6 +768,13 @@ proc testReadGraphFile() {
   verifyPopulatedTriples(triples);
 }
 
+proc testReadBigGraph() {
+  resetPartitions();
+  var count = 0;
+  for t in readGraphFile("data/small_chriple.txt") do count += 1;
+  writeln("found ", count, " triples in big graph");
+}
+
 proc main() {
   startVdebug("network");
 
@@ -787,6 +802,9 @@ proc main() {
 
   writeln("test read graph file");
   testReadGraphFile();
+
+  writeln("test read big graph");
+  testReadBigGraph();
 
   stopVdebug();
 }
