@@ -17,6 +17,10 @@ module Segment {
     timing("initialized partitions in ",t.elapsed(TimeUnits.microseconds), " microseconds");
   }
 
+  proc optimizePartitions() {
+    forall p in Partitions do p.optimize();
+  }
+
   proc resetPartitions() {
     forall p in Partitions do p.reset();
   }
