@@ -87,10 +87,55 @@ module Query {
     delete segment;
   }
 
+  iter pdump() {
+    halt("serial iteration not supported");
+    yield new Triple(0,0,0);
+  }
+
+  iter pdump(param tag: iterKind)
+    where tag == iterKind.leader {
+
+    coforall loc in Locales do on loc {
+      for t in Partitions[here.id].dump() do yield t;
+    }
+  }
+
+  iter pdump(param tag: iterKind, followThis)
+    where tag == iterKind.follower && followThis.size == 1 {
+
+    writeln("Follower received ", followThis, " as work chunk; shifting to ");
+
+    for i in followThis(1) do yield i;
+  }
+
+  iter pdump(param tag: iterKind)
+    where tag == iterKind.standalone {
+
+    coforall loc in Locales do on loc {
+      for t in Partitions[here.id].dump() do yield t;
+    }
+  }
+
   proc printTriples(q: Query) {
     for result in query(q) {
       writeln(result.triple);
     }
+  }
+
+  class Counter {
+    var count: atomic uint;
+  }
+
+  proc countAllTriples() {
+    var counter: Counter = new Counter();
+    forall r in pdump() do counter.count.add(1);
+    return counter.count.read();
+  }
+
+  proc countTriples(q: Query) {
+    var count = 0;
+    for result in query(q) do count += 1;
+    return count;
   }
 
   proc printPartitionQueryTriples(partitionQueries: [0..#numLocales] Query, topQuery: Query) {

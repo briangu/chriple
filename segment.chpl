@@ -72,11 +72,12 @@ module Segment {
   class PredicateEntry {
     var predicate: PredicateId;
     var initialEntryCount = 128*1024;
-    var entriesArrayIncrementCount = 100;
+    var entriesArrayIncrementCount = 1024;
 
     var count: int;
-    var soEntries: [0..#initialEntryCount] EntityPair;
-    var osEntries: [0..#initialEntryCount] EntityPair;
+    var soEntriesDomain: domain(1) = {0..#initialEntryCount};
+    var soEntries: [soEntriesDomain] EntityPair;
+    var osEntries: [soEntriesDomain] EntityPair;
 
     inline proc add(triple: Triple) {
       var soEntry = triple.toSOPair();
@@ -84,11 +85,10 @@ module Segment {
       const found = false;
       if (!found) {
         /*info("adding ", triple, " count = ", count, " ", soEntries.size);*/
-        if (count >= soEntries.size) {
-          info("increasing size of soEntries to ", count+entriesArrayIncrementCount);
+        if (count >= soEntries.domain.high) {
+          /*info("increasing size of soEntries to ", count+entriesArrayIncrementCount);*/
           // TODO: optimize inserts
-          soEntries.insert(count+entriesArrayIncrementCount, 0);
-          osEntries.insert(count+entriesArrayIncrementCount, 0);
+          soEntriesDomain = {soEntriesDomain.low..soEntriesDomain.high*2};
         }
         soEntries[count] = soEntry;
         osEntries[count] = triple.toOSPair();
