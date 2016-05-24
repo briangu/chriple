@@ -9,6 +9,9 @@ chriple_dbg:
 dbg:
 	chpl --print-passes -g -o bin/chriple chriple-naive.chpl
 
+test:
+	chpl --print-passes -g -o bin/chriple-test chriple-test.chpl
+
 bin:
 	mkdir -p bin
 
