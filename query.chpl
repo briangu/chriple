@@ -98,7 +98,8 @@ module Query {
     where tag == iterKind.leader {
 
     coforall loc in Locales do on loc {
-      for t in Partitions[here.id].dump() do yield t;
+      var p = Partitions[here.id];
+      local for t in p.dump() do yield t;
     }
   }
 
@@ -114,7 +115,8 @@ module Query {
     where tag == iterKind.standalone {
 
     coforall loc in Locales do on loc {
-      for t in Partitions[here.id].dump() do yield t;
+      var p = Partitions[here.id];
+      local for t in p.dump() do yield t;
     }
   }
 
