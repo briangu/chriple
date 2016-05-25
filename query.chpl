@@ -58,7 +58,8 @@ module Query {
         var innerCount = 0;
 
         local {
-          for res in Partitions[here.id].query(lq) {
+          var p = Partitions[here.id];
+          for res in p.query(lq) {
             innerResults[innerCount] = res.triple;
             innerCount += 1;
             if (innerCount >= lq.partitionLimit) then break;
@@ -89,34 +90,31 @@ module Query {
     delete segment;
   }
 
-  iter pdump() {
-    halt("serial iteration not supported");
+  iter dump() {
+    halt("query: serial iteration not supported");
     yield new Triple(0,0,0);
   }
 
-  iter pdump(param tag: iterKind)
+  iter dump(param tag: iterKind)
     where tag == iterKind.leader {
 
     coforall loc in Locales do on loc {
       var p = Partitions[here.id];
-      local for t in p.dump() do yield t;
+      forall t in p.dump() do yield t;
     }
   }
 
-  iter pdump(param tag: iterKind, followThis)
+  iter dump(param tag: iterKind, followThis)
     where tag == iterKind.follower && followThis.size == 1 {
-
-    writeln("Follower received ", followThis, " as work chunk; shifting to ");
-
-    for i in followThis(1) do yield i;
+    forall i in followThis(1) do yield i;
   }
 
-  iter pdump(param tag: iterKind)
+  iter dump(param tag: iterKind)
     where tag == iterKind.standalone {
 
     coforall loc in Locales do on loc {
       var p = Partitions[here.id];
-      local for t in p.dump() do yield t;
+      forall t in p.dump() do yield t;
     }
   }
 
@@ -132,7 +130,7 @@ module Query {
 
   proc countAllTriples() {
     var counter: Counter = new Counter();
-    forall r in pdump() do counter.count.add(1);
+    forall r in dump() do counter.count.add(1);
     return counter.count.read();
   }
 

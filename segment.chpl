@@ -4,7 +4,7 @@ module Segment {
 
   // Globally reusable Null / empty singleton operand
   var NullOperand: [PrivateSpace] Operand;
-  var Partitions: [PrivateSpace] Segment;
+  var Partitions: [PrivateSpace] NaiveMemorySegment;
 
   proc initPartitions() {
     var t: Timer;
@@ -67,9 +67,27 @@ module Segment {
       halt("not implemented");
     }
 
-    iter dump(): Triple {
-      halt("not implemented");
+    iter dump() {
+      halt("1:serial iteration not supported");
       yield new Triple(0,0,0);
+    }
+
+    iter dump(param tag: iterKind)
+      where tag == iterKind.leader {
+        halt("2:serial iteration not supported");
+        yield new Triple(0,0,0);
+    }
+
+    iter dump(param tag: iterKind, followThis)
+      where tag == iterKind.follower && followThis.size == 1 {
+        halt("3:serial iteration not supported");
+        yield new Triple(0,0,0);
+    }
+
+    iter dump(param tag: iterKind)
+      where tag == iterKind.standalone {
+        halt("4:serial iteration not supported");
+        yield new Triple(0,0,0);
     }
   }
 
@@ -108,8 +126,23 @@ module Segment {
       // TODO: remove duplicates
     }
 
-    iter dump(): Triple {
+    iter dump() {
       for i in 0..#count do yield toTriple(soEntries[i], predicate);
+    }
+
+    iter dump(param tag: iterKind)
+      where tag == iterKind.leader {
+      forall i in 0..#count do yield toTriple(soEntries[i], predicate);
+    }
+
+    iter dump(param tag: iterKind, followThis)
+      where tag == iterKind.follower && followThis.size == 1 {
+      for i in followThis(1) do yield i;
+    }
+
+    iter dump(param tag: iterKind)
+      where tag == iterKind.standalone {
+      forall i in 0..#count do yield toTriple(soEntries[i], predicate);
     }
   }
 
@@ -544,6 +577,31 @@ module Segment {
           for triple in entry.dump() do yield triple;
         }
       }
+    }
+
+    iter dump(param tag: iterKind)
+      where tag == iterKind.leader {
+      forall i in predicateHashTable.domain {
+        var entry = predicateHashTable[i];
+        if (entry) {
+          forall triple in entry.dump() do yield triple;
+        }
+      }
+    }
+
+    iter dump(param tag: iterKind, followThis)
+      where tag == iterKind.follower && followThis.size == 1 {
+      for i in followThis(1) do yield i;
+    }
+
+    iter dump(param tag: iterKind)
+      where tag == iterKind.standalone {
+        forall i in predicateHashTable.domain {
+          var entry = predicateHashTable[i];
+          if (entry) {
+            forall triple in entry.dump() do yield triple;
+          }
+        }
     }
   }
 }
