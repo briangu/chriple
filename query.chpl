@@ -42,6 +42,8 @@ module Query {
   proc populateLocalSegment(partitionQueries: [0..#numLocales] Query): Segment {
     var segment = new NaiveMemorySegment();
 
+    // TODO: parallelize scatter gather
+    //        requires making addTriples thread safe
     for loc in Locales {
       if (partitionQueries[loc.id].instructionBuffer == nil) then continue;
 

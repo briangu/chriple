@@ -18,11 +18,11 @@ module Common {
     }
   }
 
-  proc toTriple(soPair: EntityPair, predicate: PredicateId): Triple {
+  inline proc toTriple(soPair: EntityPair, predicate: PredicateId): Triple {
     return new Triple((soPair >> 32):EntityId, predicate, soPair:EntityId);
   }
 
-  proc toTripleFromOSEntry(osPair: EntityPair, predicate: PredicateId): Triple {
+  inline proc toTripleFromOSEntry(osPair: EntityPair, predicate: PredicateId): Triple {
     return new Triple(osPair: EntityId, predicate, (osPair >> 32):EntityId);
   }
 

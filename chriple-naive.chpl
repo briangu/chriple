@@ -75,5 +75,10 @@ proc main() {
   q.getWriter().writeScanPredicate(0,0,0);
 
   writeln(countTriples(q));*/
-  writeln("total triples added: ", countAllTriples());
+  timer.clear();
+  timer.start();
+  var count = countAllTriples();
+  timer.stop();
+  writeln("total triples added: ", count);
+  writeln("query time: ", timer.elapsed(), " seconds");
 }
